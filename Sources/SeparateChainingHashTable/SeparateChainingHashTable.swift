@@ -27,389 +27,473 @@
 //
 import Foundation
 
-public final class SeparateChainingHashTable<Key: Hashable, Value>: NSCopying {
-    public internal(set) var count: Int
+public struct SeparateChainingHashTable<Key: Hashable, Value> {
+    public typealias Element = (key: Key, value: Value)
     
-    public internal(set) var capacity: Int
+    final class ID {  }
     
-    internal private(set) var hashTableCapacity: Int
+    private(set) var buffer: HashTableBuffer<Key, Value>? = nil
     
-    internal private(set) var hashTable: UnsafeMutablePointer<Node?>
+    private(set) var id = ID()
     
-    public init(minimumCapacity capacity: Int) {
-        self.hashTableCapacity = Self.hashTableCapacityFor(requestedCapacity: capacity)
-        self.capacity = capacity
-        self.count = 0
-        self.hashTable = UnsafeMutablePointer<Node?>.allocate(capacity: hashTableCapacity)
-        self.hashTable.initialize(repeating: nil, count: hashTableCapacity)
+    @inline(__always)
+    public var capacity: Int { buffer?.capacity ?? 0 }
+    
+    @inline(__always)
+    public var count: Int { buffer?.count ?? 0 }
+    
+    @inline(__always)
+    public var isEmpty: Bool { buffer?.isEmpty ?? true }
+    
+    @inline(__always)
+    fileprivate var freeCapacity: Int { capacity - count }
+    
+    @inline(__always)
+    fileprivate static var minBufferCapacity: Int {
+        HashTableBuffer<Key, Value>.minTableCapacity
     }
     
-    deinit {
-        hashTable.deinitialize(count: hashTableCapacity)
-        hashTable.deallocate()
-    }
+    public init() {  }
     
-    public func copy(with zone: NSZone? = nil) -> Any {
-        let clone = SeparateChainingHashTable(minimumCapacity: 0)
-        clone.capacity = capacity
-        clone.count = count
-        clone.hashTableCapacity = hashTableCapacity
-        clone.hashTable = UnsafeMutablePointer.allocate(capacity: hashTableCapacity)
-        for i in 0..<hashTableCapacity {
-            let copiedNode = hashTable[i]?.copy(with: zone) as? Node
-            clone.hashTable.advanced(by: i).initialize(to: copiedNode)
-        }
+    public init(minimumCapacity k: Int) {
+        precondition(k >= 0, "minimumCapacity must not be negative")
+        guard k > 0 else { return }
         
-        return clone
+        let minimumCapacity = Swift.max(Self.minBufferCapacity, k)
+        
+        self.buffer = HashTableBuffer(minimumCapacity: minimumCapacity)
     }
     
-    internal init(_ other: SeparateChainingHashTable) {
-        self.capacity = other.capacity
-        self.count = other.count
-        self.hashTableCapacity = other.hashTableCapacity
-        self.hashTable = UnsafeMutablePointer.allocate(capacity: hashTableCapacity)
-        for i in 0..<hashTableCapacity {
-            let otherNodeClone = other.hashTable[i]?.clone()
-            self.hashTable.advanced(by: i).initialize(to: otherNodeClone)
-        }
-    }
-    
-}
-
-// MARK: - Computed properties
-extension SeparateChainingHashTable {
-    @inlinable
-    public var isFull: Bool { availableFreeCapacity == 0 }
-    
-    @inlinable
-    public var isEmpty: Bool { count == 0 }
-    
-    @inlinable
-    var availableFreeCapacity: Int { capacity - count }
-    
-}
-
-// MARK: - Convenience initializers
-extension SeparateChainingHashTable {
-    public convenience init<S: Sequence>(uniqueKeysWithValues keysAndValues: S) where S.Iterator.Element == Element {
+    public init<S: Sequence>(uniqueKeysWithValues keysAndValues: S) where S.Iterator.Element == Element {
         self.init(keysAndValues) { _, _ in
             preconditionFailure("keys must be unique")
         }
     }
     
-    public convenience init<S>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Iterator.Element == Element {
+    public init<S>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Iterator.Element == Element {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             self.init(other)
-        } else {
-            self.init(minimumCapacity: keysAndValues.underestimatedCount)
-            var iter = keysAndValues.makeIterator()
-            while let element = iter.next() {
-                try self.setValue(element.1, forKey: element.0, uniquingKeysWith: combine)
-            }
+            
+            return
         }
+        
+        var newBuffer: HashTableBuffer<Key, Value>? = nil
+        let done: Bool = try keysAndValues
+            .withContiguousStorageIfAvailable { kvBuffer in
+                guard
+                    kvBuffer.baseAddress != nil && kvBuffer.count > 0
+                else { return true }
+                
+                newBuffer = HashTableBuffer(minimumCapacity: Swift.max(Self.minBufferCapacity, (kvBuffer.count * 3) / 2))
+                for keyValuePair in keysAndValues {
+                    try newBuffer!.setValue(keyValuePair.value, forKey: keyValuePair.key, uniquingKeysWith: combine)
+                }
+                
+                return true
+            } ?? false
+        if !done {
+            var kvIter = keysAndValues.makeIterator()
+            if let firstElement = kvIter.next() {
+                newBuffer = HashTableBuffer(minimumCapacity: Swift.max(Self.minBufferCapacity, (keysAndValues.underestimatedCount * 3) / 2))
+                try newBuffer!.setValue(firstElement.value, forKey: firstElement.key, uniquingKeysWith: combine)
+                while let element = kvIter.next() {
+                    try newBuffer!.setValue(element.value, forKey: element.key, uniquingKeysWith: combine)
+                    if newBuffer!.tableIsTooTight {
+                        newBuffer!.resizeTo(newCapacity: newBuffer!.capacity * 2)
+                    }
+                }
+            }
+            
+        }
+        self.init(buffer: newBuffer)
     }
     
-    public convenience init<S>(grouping values: S, by keyForValue: (S.Element) throws -> Key) rethrows where Value == [S.Element], S : Sequence {
-        self.init(minimumCapacity: values.underestimatedCount)
-        var valuesIter = values.makeIterator()
+    public init<S>(grouping values: S, by keyForValue: (S.Element) throws -> Key) rethrows where Value == [S.Element], S : Sequence {
+        var newBuffer: HashTableBuffer<Key, Value>? = nil
+        let done: Bool = try values
+            .withContiguousStorageIfAvailable { vBuff in
+                guard
+                    vBuff.baseAddress != nil && vBuff.count > 0
+                else { return true }
+                newBuffer = HashTableBuffer(minimumCapacity: (vBuff.count * 3) / 2)
+                for v in vBuff {
+                    let k = try keyForValue(v)
+                    newBuffer!.setValue([v], forKey: k, uniquingKeysWith: +)
+                }
+                
+                return true
+            } ?? false
         
-        while let value = valuesIter.next() {
-            let key = try keyForValue(value)
-            self.setValue([value], forKey: key, uniquingKeysWith: +)
+        if !done {
+            var valuesIter = values.makeIterator()
+            if let firstValue = valuesIter.next() {
+                newBuffer = HashTableBuffer(minimumCapacity: Swift.max(Self.minBufferCapacity, (values.underestimatedCount * 3) / 2))
+                let fKey = try keyForValue(firstValue)
+                newBuffer!.setValue([firstValue], forKey: fKey, uniquingKeysWith: +)
+                while let value = valuesIter.next() {
+                    let key = try keyForValue(value)
+                    newBuffer!.setValue([value], forKey: key, uniquingKeysWith: +)
+                    if newBuffer!.tableIsTooTight {
+                        newBuffer!.resizeTo(newCapacity: newBuffer!.capacity * 2)
+                    }
+                }
+            }
         }
+        
+        self.init(buffer: newBuffer)
+    }
+    
+    fileprivate init(_ other: SeparateChainingHashTable) {
+        self.init(buffer: other.buffer)
+    }
+    
+    fileprivate init(buffer: HashTableBuffer<Key, Value>?) {
+        self.buffer = buffer
     }
     
 }
 
-// MARK: - Public methods
+// MARK: - C.R.U.D. methods
 extension SeparateChainingHashTable {
-    public func clone() -> SeparateChainingHashTable {
-        SeparateChainingHashTable(self)
-    }
-    
-    public func reserveCapacity(_ k: Int) {
-        let needed = hashTableCapacityNeededTo(reserveCapacity: k)
-        guard needed > hashTableCapacity else { return }
+    public subscript(_ k: Key) -> Value? {
+        get { getValue(forKey: k) }
         
-        self.capacity = count + k
-        resizeHashTableTo(hashTableCapacity: needed)
+        mutating set {
+            guard let v = newValue else {
+                removeValue(forKey: k)
+                
+                return
+            }
+            
+            updateValue(v, forKey: k)
+        }
     }
     
-    public func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
+    public func getValue(forKey k: Key) -> Value? {
+        buffer?.getValue(forKey: k)
+    }
+    
+    @discardableResult
+    public mutating func updateValue(_ v: Value, forKey k: Key) -> Value? {
+        makeUniqueEventuallyIncreasingCapacity()
+        
+        return buffer!.updateValue(v, forKey: k)
+    }
+    
+    @discardableResult
+    public mutating func removeValue(forKey k: Key) -> Value? {
+        makeUniqueEventuallyReducingCapacity()
+        
+        return buffer?.removeElement(withKey: k)
+    }
+    
+    public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+        id = ID()
+        guard buffer != nil else { return }
+        
+        guard keepCapacity else {
+            buffer = nil
+            
+            return
+        }
+        
+        let prevCapacity = capacity
+        buffer = HashTableBuffer(minimumCapacity: prevCapacity)
+    }
+    
+}
+
+// MARK: - Other methods
+extension SeparateChainingHashTable {
+    public mutating func reserveCapacity(_ minimumCapacity: Int) {
+        precondition(minimumCapacity >= 0, "minimumCapacity must not be negative")
+        makeUniqueReserving(minimumCapacity: minimumCapacity)
+    }
+    
+    public mutating func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             try merge(other, uniquingKeysWith: combine)
         } else {
-            var iter = keysAndValues.makeIterator()
-            while let element = iter.next() {
-                try setValue(element.1, forKey: element.0, uniquingKeysWith: combine)
-            }
+            makeUnique()
+            try buffer!.merge(keysAndValues, uniquingKeysWith: combine)
         }
     }
     
-    public func merge(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
+    public mutating func merge(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
+        makeUnique()
         guard !other.isEmpty else { return }
         
-        var keysAndValues: [Element] = Array(UnsafeBufferPointer(start: other.hashTable, count: other.hashTableCapacity))
-            .compactMap { $0 }
-            .flatMap { $0 }
-        let newCapacity = count + other.count
-        let newHTCapacity = hashTableCapacityNeededTo(reserveCapacity: newCapacity)
-        if newHTCapacity > hashTableCapacity {
-            let thisKeysAndValues: [Element] = Array(UnsafeBufferPointer(start: hashTable, count: hashTableCapacity))
-                .compactMap { $0 }
-                .flatMap { $0 }
-            keysAndValues.append(contentsOf: thisKeysAndValues)
-            capacity = newCapacity
-            hashTable.deinitialize(count: hashTableCapacity)
-            hashTable.deallocate()
-            hashTable = UnsafeMutablePointer.allocate(capacity: newHTCapacity)
-            hashTable.initialize(repeating: nil, count: newHTCapacity)
-            hashTableCapacity = newHTCapacity
-            count = 0
+        try! buffer!.merge(other.buffer!, uniquingKeysWith: combine)
+    }
+    
+    func merging(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable {
+        guard !isEmpty else { return other }
+        
+        guard !other.isEmpty else { return self }
+        
+        let mergedBuffer = (buffer!.copy() as! HashTableBuffer<Key, Value>)
+        try mergedBuffer.merge(other.buffer!, uniquingKeysWith: combine)
+        
+        return SeparateChainingHashTable(buffer: mergedBuffer)
+    }
+    
+    func merging<S>(_ other: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable where S : Sequence, S.Element == Element {
+        if let otherHT = other as? SeparateChainingHashTable {
+            
+            return try merging(otherHT, uniquingKeysWith: combine)
         }
-        for element in keysAndValues {
-            let idx = hashIndex(forKey: element.0)
-            if let n = hashTable[idx] {
-                let prevNCount = n.count
-                try n.setValue(element.1, forKey: element.0, uniquingKeysWith: combine)
-                if prevNCount < n.count {
-                    count += 1
-                }
-            } else {
-                let n = Node(key: element.0, value: element.1)
-                hashTable[idx] = n
-                count += 1
-            }
+        
+        guard
+            !isEmpty
+        else {
+            return try SeparateChainingHashTable(other, uniquingKeysWith: combine)
         }
+        
+        let mergedBuffer = (buffer!.copy() as! HashTableBuffer<Key, Value>)
+        try mergedBuffer.merge(other, uniquingKeysWith: combine)
+        
+        return SeparateChainingHashTable(buffer: mergedBuffer)
     }
     
     public func mapValues<T>(_ transform: (Value) throws -> T) rethrows -> SeparateChainingHashTable<Key, T> {
-        let mapped = SeparateChainingHashTable<Key, T>(minimumCapacity: 0)
-        mapped.hashTable.deinitialize(count: mapped.hashTableCapacity)
-        mapped.hashTable.deallocate()
-        mapped.capacity = capacity
-        mapped.hashTableCapacity = hashTableCapacity
-        mapped.hashTable = UnsafeMutablePointer.allocate(capacity: mapped.hashTableCapacity)
-        mapped.hashTable.initialize(repeating: nil, count: hashTableCapacity)
-        for idx in 0..<hashTableCapacity where hashTable[idx] != nil {
-            let newNode = try SeparateChainingHashTable<Key, T>.Node(key: hashTable[idx]!.key, value: transform(hashTable[idx]!.value))
-            var current = hashTable[idx]?.next
-            while current != nil {
-                try newNode.setValue(transform(current!.value), forKey: current!.key)
-                current = current?.next
-            }
-            mapped.hashTable[idx] = newNode
-        }
-        mapped.count = count
+        let mappedBuffer = try buffer?.mapValues(transform)
         
-        return mapped
+        return SeparateChainingHashTable<Key, T>(buffer: mappedBuffer)
     }
     
-    func compactMapValues<T>(_ transform: (Value) throws -> T?) rethrows -> SeparateChainingHashTable<Key, T> {
-        let mapped = SeparateChainingHashTable<Key, T>(minimumCapacity: 0)
-        mapped.hashTable.deinitialize(count: mapped.hashTableCapacity)
-        mapped.hashTable.deallocate()
-        mapped.capacity = capacity
-        mapped.hashTableCapacity = hashTableCapacity
-        mapped.hashTable = UnsafeMutablePointer.allocate(capacity: mapped.hashTableCapacity)
-        mapped.hashTable.initialize(repeating: nil, count: hashTableCapacity)
-        for idx in 0..<hashTableCapacity {
-            var current = hashTable[idx]
-            while let currentElement = current?.element {
-                if let mappedValue = try transform(currentElement.1) {
-                    let mIdx = mapped.hashIndex(forKey: currentElement.0)
-                    if let mNode = mapped.hashTable[mIdx] {
-                        mNode.setValue(mappedValue, forKey: currentElement.0)
-                    } else {
-                        let mNode = SeparateChainingHashTable<Key, T>.Node(key: currentElement.0, value: mappedValue)
-                        mapped.hashTable[mIdx] = mNode
-                    }
-                    count += 1
-                }
-                current = current?.next
-            }
-        }
+    public func compactMapValues<T>(_ transform: (Value) throws -> T?) rethrows -> SeparateChainingHashTable<Key, T> {
+        let mappedBuffer = try buffer?.compactMapValues(transform)
         
-        return mapped
+        return SeparateChainingHashTable<Key, T>(buffer: mappedBuffer)
     }
     
-}
-
-// MARK: - C.R.U.D.
-extension SeparateChainingHashTable {
+    public func filter(_ isIncluded: (Element) throws -> Bool) rethrows -> SeparateChainingHashTable {
+        let filtered = try self.buffer?.filter(isIncluded)
+        
+        return SeparateChainingHashTable(buffer: filtered)
+    }
+    
     @discardableResult
-    public func getValue(forKey k: Key) -> Value? {
-        let idx = hashIndex(forKey: k)
+    public mutating func remove(at index: Index) -> Element {
+        precondition(index.isValidFor(self), "invalid index for this hash table")
+        precondition(index.currentBag != nil, "index out of bounds")
+        let removedElement = index.currentBag!.element
+        makeUniqueEventuallyReducingCapacity()
+        defer { removeValue(forKey: removedElement.key) }
         
-        return hashTable[idx]?.getValue(forKey: k)
-    }
-    
-    public func setValue(_ v: Value, forKey k: Key, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
-        resizeCapacityIfNeeded()
-        let idx = hashIndex(forKey: k)
-        if let node = hashTable[idx] {
-            let prevNodeCount = node.count
-            try node.setValue(v, forKey: k, uniquingKeysWith: combine)
-            count += prevNodeCount < node.count ? 1 : 0
-        } else {
-            let newNode = Node(key: k, value: v)
-            hashTable[idx] = newNode
-            count += 1
-        }
-    }
-    
-    public func setValue(_ v: Value, forKey k: Key) {
-        setValue(v, forKey: k, uniquingKeysWith: { _, newValue in newValue })
-    }
-    
-    public func removeValue(forKey k: Key) {
-        let idx = hashIndex(forKey: k)
-        guard
-            let node = hashTable[idx]
-        else { return }
-        
-        let prevNodeCount = node.count
-        hashTable[idx] = node.removingValue(forKey: k)
-        if prevNodeCount > (hashTable[idx]?.count ?? 0) {
-            count -= 1
-            resizeCapacityIfNeeded()
-        }
+        return removedElement
     }
     
 }
 
-// MARK: - Helpers
+// MARK: - C.O.W. internal utilities
 extension SeparateChainingHashTable {
-    func hashIndex(forKey k: Key) -> Int {
-        var hasher = Hasher()
-        hasher.combine(k)
-        let hasValue = hasher.finalize()
-        
-        return (hasValue & 0x7fffffff) % hashTableCapacity
-    }
-    
-}
-
-// MARK: - buffer resizing and capacity helpers
-extension SeparateChainingHashTable {
-    static var minHashTableCapacity: Int { 3 }
-    
-    static func hashTableCapacityFor(requestedCapacity k: Int) -> Int {
-        precondition(k >= 0, "requested capacity must not be negative")
-        guard k > 0 else { return Self.minHashTableCapacity }
-        
-        return ((k * 3) / 2)
-    }
-    
-    func hashTableCapacityNeededTo(reserveCapacity k: Int) -> Int {
-        precondition(k >= 0, "requested capacity must not be negative")
+    mutating func makeUniqueEventuallyIncreasingCapacity() {
         guard
-            k > availableFreeCapacity
-        else { return hashTableCapacity }
-        
-        return Self.hashTableCapacityFor(requestedCapacity: count + k)
-    }
-    
-    func resizeCapacityIfNeeded() {
-        var newCapacity = capacity
-        if isFull {
-            newCapacity = capacity * 2
-        } else if count <= capacity / 8 {
-            newCapacity = capacity / 2
+            (buffer?.tableIsTooTight ?? false)
+        else {
+            makeUnique()
+            
+            return
         }
         
-        defer { capacity = newCapacity }
-        
-        let newHTCapacity = hashTableCapacityNeededTo(reserveCapacity: newCapacity)
-        guard
-            newHTCapacity != hashTableCapacity
-        else { return }
-        
-        resizeHashTableTo(hashTableCapacity: newHTCapacity)
+        id = ID()
+        buffer = buffer!.clone(newCapacity: capacity * 2)
     }
     
-    func resizeHashTableTo(hashTableCapacity k: Int) {
-        assert(k >= ((count * 3) / 2), "proposed capacity must be greater than or equal 3/2 of current count")
-        let oldHTCapacity = hashTableCapacity
-        hashTableCapacity = k
-        let newHashTable = UnsafeMutablePointer<Node?>.allocate(capacity: hashTableCapacity)
-        newHashTable.initialize(repeating: nil, count: hashTableCapacity)
-        for oldIdx in 0..<oldHTCapacity {
-            var current = hashTable.advanced(by: oldIdx).move()
-            while current != nil {
-                let oldNext = current?.next
-                current!.next = nil
-                current!.count = 1
-                let newIdx = hashIndex(forKey: current!.key)
-                if newHashTable[newIdx] != nil {
-                    let newNode = newHashTable.advanced(by: newIdx).move()!
-                    current!.next = newNode
-                    current!.count += newNode.count
-                    newHashTable.advanced(by: newIdx).initialize(to: current)
-                } else {
-                    newHashTable[newIdx] = current
-                }
-                current = oldNext
-            }
+    mutating func makeUniqueEventuallyReducingCapacity() {
+        guard
+            !isEmpty
+        else {
+            id = ID()
+            buffer = nil
+            
+            return
         }
-        hashTable.deallocate()
-        hashTable = newHashTable
+        
+        guard
+            (buffer!.tableIsTooSparse)
+        else {
+            makeUnique()
+            
+            return
+        }
+        
+ 
+        id = ID()
+        let mCapacity = Swift.max(capacity / 2, Self.minBufferCapacity)
+        buffer = buffer!.clone(newCapacity: mCapacity)
+    }
+    
+    mutating func makeUniqueReserving(minimumCapacity k: Int) {
+        assert(k >= 0, "minimumCapacity musty not be negative")
+        guard
+            freeCapacity < k
+        else {
+            makeUnique()
+            
+            return
+        }
+        
+        id = ID()
+        let mCapacity = buffer == nil ? Swift.max(k, Self.minBufferCapacity) : Swift.max(((count + k) * 3) / 2, capacity * 2)
+        buffer = buffer?.clone(newCapacity: mCapacity) ?? HashTableBuffer(minimumCapacity: mCapacity)
+    }
+    
+    mutating func makeUnique() {
+        id = ID()
+        if !isKnownUniquelyReferenced(&buffer) {
+            buffer = buffer?.copy() as? HashTableBuffer<Key, Value> ?? HashTableBuffer(minimumCapacity: Self.minBufferCapacity)
+        }
     }
     
 }
 
 // MARK: - Sequence conformance
 extension SeparateChainingHashTable: Sequence {
-    public typealias Element = (Key, Value)
-    
     public var underestimatedCount: Int { count }
     
     public func makeIterator() -> AnyIterator<Element> {
-        withExtendedLifetime(self, { AnyIterator(_Iterator($0)) })
+        guard
+            !isEmpty
+        else {
+            
+            return AnyIterator { return nil }
+        }
+        
+        return buffer!.makeIterator()
     }
     
-    private struct _Iterator: IteratorProtocol {
-        unowned(unsafe) var ht: SeparateChainingHashTable
+}
+
+// MARK: - Collection conformance
+extension SeparateChainingHashTable: Collection {
+    public struct Index: Comparable {
+        internal var id: ID
         
-        var currentIdx: Int = 0
+        internal var currentTableIndex: Int
         
-        var currentNodeIterator: AnyIterator<Element>? = nil
+        internal unowned(unsafe) var currentBag: HashTableBuffer<Key, Value>.Bag?
         
-        init(_ ht: SeparateChainingHashTable) {
-            self.ht = ht
-            moveToNextNodeIterator()
+        internal unowned(unsafe) var buffer: HashTableBuffer<Key, Value>?
+        
+        internal init(asStartIndexOf ht: SeparateChainingHashTable) {
+            self.id = ht.id
+            self.currentTableIndex = 0
+            self.buffer = ht.buffer
+            moveToNextElement()
         }
         
-        mutating func next() -> Element? {
-            if let nextElement = currentNodeIterator?.next() {
+        internal init(asEndIndexOf ht: SeparateChainingHashTable) {
+            self.id = ht.id
+            self.buffer = ht.buffer
+            self.currentTableIndex = ht.capacity
+        }
+        
+        internal init(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
+            self.id = ht.id
+            self.buffer = ht.buffer
+            self.currentTableIndex = 0
+            while currentTableIndex < (buffer?.capacity ?? 0) {
+                currentBag = self.buffer?.table[currentTableIndex]
+                while let e = currentBag {
+                    guard e.key != k else { return }
+                    
+                    currentBag = e.next
+                }
                 
-                return nextElement
-            } else {
-                moveToNextNodeIterator()
+                currentTableIndex += 1
+            }
+        }
+        
+        internal mutating func moveToNextElement() {
+            guard
+                buffer != nil
+            else { return }
+            
+            currentBag = currentBag?.next
+            
+            if currentBag == nil {
+                while currentTableIndex < buffer!.capacity {
+                    if let bag = buffer!.table[currentTableIndex] {
+                        currentBag = bag
+                        currentTableIndex += 1
+                        
+                        break
+                    }
+                    currentTableIndex += 1
+                }
+            }
+        }
+        
+        internal func isValidFor(_ ht: SeparateChainingHashTable) -> Bool {
+            id === ht.id && buffer === ht.buffer
+        }
+        
+        internal static func areValid(lhs: Index, rhs: Index) -> Bool {
+            lhs.id === rhs.id && lhs.buffer === rhs.buffer
+        }
+        
+        public static func == (lhs: Index, rhs: Index) -> Bool {
+            precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
+            
+            return lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBag === rhs.currentBag
+        }
+        
+        // MARK: - Index Comparable conformance
+        public static func < (lhs: Index, rhs: Index) -> Bool {
+            precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
+            guard
+                lhs.currentTableIndex != rhs.currentTableIndex
+            else {
+                switch (lhs.currentBag, rhs.currentBag) {
+                case (nil, nil): return false
+                case (.some(_ ), nil): return true
+                case (nil, .some(_ )): return false
+                case (.some(let lB), .some(let rB)):
+                    if lB === rB { return false }
+                    return rB.count < lB.count
+                }
             }
             
-            return currentNodeIterator?.next()
+            return lhs.currentTableIndex < rhs.currentTableIndex
         }
         
-        private mutating func moveToNextNodeIterator() {
-            while currentIdx < ht.hashTableCapacity {
-                if ht.hashTable[currentIdx] != nil {
-                    withExtendedLifetime(ht.hashTable[currentIdx]!, { currentNodeIterator = $0.makeIterator() })
-                    currentIdx += 1
-                    
-                    return
-                }
-                currentIdx += 1
-            }
-        }
+    }
+    
+    public var startIndex: Index { Index(asStartIndexOf: self) }
+    
+    public var endIndex: Index { Index(asEndIndexOf: self) }
+    
+    public func formIndex(after i: inout Index) {
+        precondition(i.isValidFor(self), "invalid index for this hash table")
         
+        i.moveToNextElement()
+    }
+    
+    public func index(after i: Index) -> Index {
+        precondition(i.isValidFor(self), "invalid index for this hash table")
+        
+        var nextIndex = i
+        nextIndex.moveToNextElement()
+        
+        return nextIndex
+    }
+    
+    public subscript(position: Index) -> (key: Key, value: Value) {
+        get {
+            precondition(position.isValidFor(self), "invalid index for this hash table")
+            precondition(position.currentBag != nil, "index out of bounds")
+           
+            return position.currentBag!.element
+        }
     }
     
 }
 
 // MARK: - ExpressibleByDictionaryLiteral conformance
 extension SeparateChainingHashTable: ExpressibleByDictionaryLiteral {
-    public convenience init(dictionaryLiteral elements: (Key, Value)...) {
+    public init(dictionaryLiteral elements: (Key, Value)...) {
         self.init(uniqueKeysWithValues: elements)
     }
     
@@ -418,15 +502,7 @@ extension SeparateChainingHashTable: ExpressibleByDictionaryLiteral {
 // MARK: - Equatable conformance
 extension SeparateChainingHashTable: Equatable where Value: Equatable {
     public static func == (lhs: SeparateChainingHashTable<Key, Value>, rhs: SeparateChainingHashTable<Key, Value>) -> Bool {
-        guard lhs !== rhs else { return true }
-            
-        guard lhs.count == rhs.count else { return false }
-        
-        for (lE, rE) in zip(lhs, rhs) where lE.0 != rE.0 || lE.1 != rE.1 {
-            return false
-        }
-        
-        return true
+        lhs.buffer == rhs.buffer
     }
     
 }
@@ -434,11 +510,7 @@ extension SeparateChainingHashTable: Equatable where Value: Equatable {
 // MARK: - Hashable conformance
 extension SeparateChainingHashTable: Hashable where Value: Hashable {
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(count)
-        for element in self {
-            hasher.combine(element.0)
-            hasher.combine(element.1)
-        }
+        hasher.combine(buffer)
     }
     
 }
@@ -446,8 +518,8 @@ extension SeparateChainingHashTable: Hashable where Value: Hashable {
 // MARK: - Codable conformance
 extension SeparateChainingHashTable: Codable where Key: Codable, Value: Codable {
     public enum Error: Swift.Error {
+        case keysAndValuesCountsNotMatching
         case duplicateKeys
-        case keysAndValuesNotEqualCount
         
     }
     
@@ -460,23 +532,26 @@ extension SeparateChainingHashTable: Codable where Key: Codable, Value: Codable 
         var keys: [Key] = []
         var values: [Value] = []
         forEach {
-            keys.append($0.0)
-            values.append($0.1)
+            keys.append($0.key)
+            values.append($0.value)
         }
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(keys, forKey: .keys)
         try container.encode(values, forKey: .values)
     }
     
-    public convenience init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let keys = try container.decode(Array<Key>.self, forKey: .keys)
         let values = try container.decode(Array<Value>.self, forKey: .values)
         guard
             keys.count == values.count
-        else { throw Error.keysAndValuesNotEqualCount }
+        else { throw Error.keysAndValuesCountsNotMatching }
         
-        try self.init(zip(keys, values), uniquingKeysWith: { _, _ in
+        let keysAndValues = zip(keys, values)
+            .lazy
+            .map { (key: $0.0, value: $0.1) }
+        try self.init(keysAndValues, uniquingKeysWith: { _, _ in
             throw Error.duplicateKeys
         })
     }

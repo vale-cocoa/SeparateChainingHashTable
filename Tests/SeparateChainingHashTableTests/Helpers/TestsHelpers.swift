@@ -54,7 +54,32 @@ func randomValue() -> Int {
 
 let err = NSError(domain: "com.vdl.error", code: 1, userInfo: nil)
 
-// MARK: - Elements for testing NSCopying
+let minBufferCapacity = HashTableBuffer<String, Int>.minTableCapacity
+
+// MARK: - GIVEN
+func givenKeysAndValuesWithoutDuplicateKeys() -> [(key: String, value: Int)] {
+    var keysAndValues = Array<(String, Int)>()
+    var insertedKeys = Set<String>()
+    for _ in 0..<Int.random(in: 1..<20) {
+        var newKey = randomKey()
+        while insertedKeys.insert(newKey).inserted == false {
+            newKey = randomKey()
+        }
+        keysAndValues.append((newKey, randomValue()))
+    }
+    
+    return keysAndValues
+}
+
+func givenKeysAndValuesWithDuplicateKeys() -> [(key: String, value: Int)] {
+    var result = givenKeysAndValuesWithoutDuplicateKeys()
+    let keys = result.map { $0.0 }
+    keys.forEach { result.append(($0, randomValue())) }
+    
+    return result
+}
+
+// MARK: - Types for testing NSCopying
 final class CKey: NSCopying, Equatable, Hashable {
     var k: String
     init(_ k: String) { self.k = k }
@@ -144,44 +169,71 @@ struct SomeWhatBadHashingKey: Equatable, Hashable {
     
 }
 
+// MARK: - Sequence of Key-Value pairs for tests
+struct Seq<Element>: Sequence {
+    var elements: [Element]
+    
+    var ucIsZero = true
+    
+    
+    init(_ elements: [Element]) {
+        self.elements = elements
+    }
+    
+    var underestimatedCount: Int {
+        ucIsZero ? 0 : elements.count / 2
+    }
+    
+    func makeIterator() -> AnyIterator<Element> {
+        AnyIterator(elements.makeIterator())
+    }
+    
+}
+
+// MARK: - other helpers
+extension HashTableBuffer {
+    var maxBagCount: Int {
+        guard !isEmpty else { return 0 }
+        
+        return UnsafeBufferPointer(start: table, count: capacity)
+            .compactMap { $0?.count }
+            .max()!
+    }
+    
+    var hashDistribuitionRatio: Double {
+        guard !isEmpty else { return 1.0 }
+        
+        return Double(count) / Double(maxBagCount)
+    }
+    
+}
+
 // MARK: - asserts
-func assertCountIsCorrentOnEveryNode<Key: Hashable, Value>(node: SeparateChainingHashTable<Key, Value>.Node, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
+func assertCountIsCorrentOnEveryNode<Key: Hashable, Value>(bag: HashTableBuffer<Key, Value>.Bag, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
     var thisCount = 1
-    var current = node
+    var current = bag
     while let n = current.next {
         thisCount += 1
         current = n
     }
     guard
-        thisCount == node.count
+        thisCount == bag.count
     else {
         XCTFail(message ?? "", file: file, line: line)
         
         return
     }
-    if let n = node.next {
-        assertCountIsCorrentOnEveryNode(node: n, message: message, file: file, line: line)
+    if let n = bag.next {
+        assertCountIsCorrentOnEveryNode(bag: n, message: message, file: file, line: line)
     }
 }
 
-func assertEqualButDifferentReference<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>.Node?, rhs: SeparateChainingHashTable<Key, Value>.Node?, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
+func assertEqualButDifferentReference<Key: Hashable, Value: Equatable>(lhs: HashTableBuffer<Key, Value>.Bag?, rhs: HashTableBuffer<Key, Value>.Bag?, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
     XCTAssertTrue(areEqualAndDifferentReference(lhs: lhs, rhs: rhs), message ?? "", file: file, line: line)
-}
-
-func assertAreEqual<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>.Node?, rhs: SeparateChainingHashTable<Key, Value>.Node?, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
-    XCTAssertTrue(areEqual(lhs: lhs, rhs: rhs), message ?? "", file: file, line: line)
-}
-
-func assertEqualButDifferentReference<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>?, rhs: SeparateChainingHashTable<Key, Value>?, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
-    XCTAssertTrue(areEqualAndDifferentReference(lhs: lhs, rhs: rhs), message ?? "", file: file, line: line)
-}
-
-func assertAreEqual<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>?, rhs: SeparateChainingHashTable<Key, Value>?, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
-    XCTAssertTrue(areEqual(lhs: lhs, rhs: rhs), message ?? "", file: file, line: line)
 }
 
 // MARK: - equality helpers
-func areEqual<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>.Node?, rhs: SeparateChainingHashTable<Key, Value>.Node?) -> Bool {
+func areEqual<Key: Hashable, Value: Equatable>(lhs: HashTableBuffer<Key, Value>.Bag?, rhs: HashTableBuffer<Key, Value>.Bag?) -> Bool {
     guard lhs !== rhs else { return true }
     
     guard
@@ -197,7 +249,7 @@ func areEqual<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Ke
     return areEqual(lhs: l.next, rhs: r.next)
 }
 
-func areEqualAndDifferentReference<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>.Node?, rhs: SeparateChainingHashTable<Key, Value>.Node?) -> Bool {
+func areEqualAndDifferentReference<Key: Hashable, Value: Equatable>(lhs: HashTableBuffer<Key, Value>.Bag?, rhs: HashTableBuffer<Key, Value>.Bag?) -> Bool {
     guard
         let l = lhs,
         let r = rhs else { return lhs == nil && rhs == nil }
@@ -213,53 +265,7 @@ func areEqualAndDifferentReference<Key: Hashable, Value: Equatable>(lhs: Separat
     return areEqual(lhs: l.next, rhs: r.next)
 }
 
-
-func areEqual<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>?, rhs: SeparateChainingHashTable<Key, Value>?) -> Bool {
-    guard lhs !== rhs else { return true }
-    
-    guard
-        let l = lhs, let r = rhs
-    else { return lhs == nil && rhs == nil }
-    
-    guard
-        l.count == r.count,
-        l.capacity == r.capacity,
-        l.hashTableCapacity == r.hashTableCapacity
-    else { return false }
-    
-    guard l.hashTable != r.hashTable else { return true }
-    
-    for idx in 0..<l.hashTableCapacity where !areEqual(lhs: l.hashTable[idx], rhs: r.hashTable[idx]) {
-        
-        return false
-    }
-    
-    return true
-}
-
-func areEqualAndDifferentReference<Key: Hashable, Value: Equatable>(lhs: SeparateChainingHashTable<Key, Value>?, rhs: SeparateChainingHashTable<Key, Value>?) -> Bool {
-    guard
-        let l = lhs, let r = rhs
-    else { return lhs == nil && rhs == nil }
-    
-    guard l !== r else { return false }
-    
-    guard
-        l.count == r.count,
-        l.capacity == r.capacity,
-        l.hashTableCapacity == r.hashTableCapacity
-    else { return false }
-    
-    guard l.hashTable != r.hashTable else { return false }
-    
-    for idx in 0..<l.hashTableCapacity where !areEqualAndDifferentReference(lhs: l.hashTable[idx], rhs: r.hashTable[idx]) {
-        
-        return false
-    }
-    
-    return true
-}
-
+/*
 func containsSameElements<Key: Hashable, Value: Equatable, S: Sequence>(_ ht: SeparateChainingHashTable<Key, Value>, of seq: S) -> Bool where S.Element == (Key, Value) {
     var otherElements = Array(seq)
     guard ht.count == otherElements.count else { return false }
@@ -276,3 +282,4 @@ func containsSameElements<Key: Hashable, Value: Equatable, S: Sequence>(_ ht: Se
     
     return otherElements.isEmpty && ht.count == yeldElements
 }
+*/
