@@ -485,6 +485,38 @@ final class SeparateChainingHashTableTests: XCTestCase {
     }
     
     func testSubscriptKeyDefaultValue_setter() {
+        // when is empty, then adds new element with key and newValue
+        XCTAssertTrue(sut.isEmpty)
+        let defaultValue = Int.random(in: 600...1000)
+        let newValue = 10_000
+        let k = notContainedKey
+        sut[k, default: defaultValue] = newValue
+        XCTAssertEqual(sut.count, 1)
+        XCTAssertEqual(sut[k], newValue)
+        
+        // when is not empty and contains key,
+        // then sets newValue for key
+        whenIsNotEmpty()
+        for key in containedKeys {
+            let prevCount = sut.count
+            sut[key, default: defaultValue] = newValue
+            XCTAssertEqual(sut.count, prevCount)
+            XCTAssertEqual(sut[key], newValue)
+        }
+        
+        // when is not empty and doesn't contain key,
+        // then adds new element with key and newValue
+        whenIsNotEmpty()
+        for _ in 0..<10 {
+            let key = notContainedKey
+            let prevCount = sut.count
+            sut[key, default: defaultValue] = newValue
+            XCTAssertEqual(sut.count, prevCount + 1)
+            XCTAssertEqual(sut[key], newValue)
+        }
+    }
+    
+    func testSubscriptKeyDefaultValue_getterThenSetter() {
         let defaultValue = Int.random(in: 600...1000)
         // when is empty, then uses default value
         for _ in 0..<10 {
@@ -510,7 +542,44 @@ final class SeparateChainingHashTableTests: XCTestCase {
     }
     
     func testSubscriptKeyDefaultValue_setter_copyOnWrite() {
-        XCTFail("test not yet implemented")
+        let defaultValue = Int.random(in: 600...1000)
+        let newValue = randomValue()
+        let k = notContainedKey
+        // when buffer is nil
+        XCTAssertNil(sut.buffer)
+        var clone = sut
+        weak var prevID = sut.id
+        weak var prevBuffer = sut.buffer
+        
+        sut[k, default: defaultValue] = newValue
+        XCTAssertFalse(sut.id === prevID, "has not updated id")
+        XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
+        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
+        XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
+        
+        // when buffer is not nil and is empty
+        sut = SeparateChainingHashTable(minimumCapacity: Int.random(in: 1...10))
+        clone = sut
+        prevID = sut.id
+        prevBuffer = sut.buffer
+        
+        sut[k, default: defaultValue] = newValue
+        XCTAssertFalse(sut.id === prevID, "has not updated id")
+        XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
+        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
+        XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
+        
+        // when is not empty
+        whenIsNotEmpty()
+        clone = sut
+        prevID = sut.id
+        prevBuffer = sut.buffer
+        
+        sut[k, default: defaultValue] = newValue
+        XCTAssertFalse(sut.id === prevID, "has not updated id")
+        XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
+        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
+        XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
     }
     
     // Main functionalities already tested by subscript_setter tests and in

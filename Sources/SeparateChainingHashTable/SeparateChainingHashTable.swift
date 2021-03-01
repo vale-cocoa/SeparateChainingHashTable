@@ -320,7 +320,7 @@ extension SeparateChainingHashTable {
             buffer?.getValue(forKey: key) ?? defaultValue()
         }
         
-        set {
+        mutating set {
             makeUniqueEventuallyIncreasingCapacity()
             buffer!.setValue(newValue, forKey: key)
         }
