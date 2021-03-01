@@ -190,7 +190,7 @@ struct Seq<Element>: Sequence {
     
 }
 
-// MARK: - other helpers
+// MARK: - Other helpers
 extension HashTableBuffer {
     var maxBagCount: Int {
         guard !isEmpty else { return 0 }
@@ -208,7 +208,7 @@ extension HashTableBuffer {
     
 }
 
-// MARK: - asserts
+// MARK: - Asserts
 func assertCountIsCorrentOnEveryNode<Key: Hashable, Value>(bag: HashTableBuffer<Key, Value>.Bag, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
     var thisCount = 1
     var current = bag
@@ -265,21 +265,3 @@ func areEqualAndDifferentReference<Key: Hashable, Value: Equatable>(lhs: HashTab
     return areEqual(lhs: l.next, rhs: r.next)
 }
 
-/*
-func containsSameElements<Key: Hashable, Value: Equatable, S: Sequence>(_ ht: SeparateChainingHashTable<Key, Value>, of seq: S) -> Bool where S.Element == (Key, Value) {
-    var otherElements = Array(seq)
-    guard ht.count == otherElements.count else { return false }
-    
-    var yeldElements = 0
-    for element in ht {
-        guard !otherElements.isEmpty else { return false }
-        
-        yeldElements += 1
-        otherElements.removeAll(where: {
-            $0.0 == element.0 && $0.1 == element.1
-        })
-    }
-    
-    return otherElements.isEmpty && ht.count == yeldElements
-}
-*/

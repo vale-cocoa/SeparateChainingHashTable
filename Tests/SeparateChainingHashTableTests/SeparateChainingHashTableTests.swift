@@ -465,6 +465,54 @@ final class SeparateChainingHashTableTests: XCTestCase {
         }
     }
     
+    func testSubscriptKeyDefaultValue_getter() {
+        // when is empty, then always returns defaultValue:
+        let defaultValue = Int.random(in: 100...1000)
+        for _ in 0..<10 {
+            sut = HashTable()
+            XCTAssertEqual(sut[notContainedKey, default: defaultValue], defaultValue)
+        }
+        
+        // when is not empty, then returns deafultValue only when
+        // there is no value for key
+        whenIsNotEmpty()
+        for k in containedKeys {
+            XCTAssertNotEqual(sut[k, default: defaultValue], defaultValue)
+        }
+        for _ in 0..<10 {
+            XCTAssertEqual(sut[notContainedKey, default: defaultValue], defaultValue)
+        }
+    }
+    
+    func testSubscriptKeyDefaultValue_setter() {
+        let defaultValue = Int.random(in: 600...1000)
+        // when is empty, then uses default value
+        for _ in 0..<10 {
+            sut = HashTable()
+            let k = notContainedKey
+            sut[k, default: defaultValue] += 30
+            XCTAssertEqual(sut[k], defaultValue + 30)
+        }
+        
+        // when is not empty, then uses stored value for key
+        //if present otherwise default value
+        whenIsNotEmpty()
+        for k in containedKeys {
+            let prev = sut[k]!
+            XCTAssertNotEqual(prev, defaultValue)
+            sut[k, default: defaultValue] += 30
+            XCTAssertEqual(sut[k], prev + 30)
+        }
+        
+        let k = notContainedKey
+        sut[k, default: defaultValue] += 30
+        XCTAssertEqual(sut[k], defaultValue + 30)
+    }
+    
+    func testSubscriptKeyDefaultValue_setter_copyOnWrite() {
+        XCTFail("test not yet implemented")
+    }
+    
     // Main functionalities already tested by subscript_setter tests and in
     // HashTableBufferTests
     func testUpdateValueForKey_copyOnWrite() {

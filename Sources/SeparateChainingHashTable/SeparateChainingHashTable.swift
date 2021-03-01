@@ -27,6 +27,152 @@
 //
 import Foundation
 
+/// A collection whose elements are key-value pairs, stored via a separate chaining hash table.
+///
+/// An hash table provides fast access to the entries it contains.
+/// Each entry in the table is identified using its key, which is a hashable type.
+/// You use that key to retrieve the corresponding value, which can be any object.
+/// Similar data types are also known as hashes or associated arrays.
+/// Create a new hastable by using a dictionary literal.
+/// In this example is shown how to create an hash table via dictionary literal:
+/// ```
+///     let occurencies: SeparateChainingHashTable<String, Int> = [
+///         "An" : 1,
+///         "hash" : 1,
+///         "table" : 1,
+///         "provides" : 1
+///         "fast" : 1
+///         "access" : 1
+///     ]
+/// ```
+/// The `Key` type for this hash table is `String`, and the `Value` type is `Int`.
+/// These are a couple of examples showing how create an empty hash table:
+/// ```
+///     var empty = SeparateChainignHashTable<String, Int>()
+///     var otherEmpty: SeparateChainingHashTable<String, Int> = [ : ]
+/// ```
+/// Any type that conforms to the `Hashable` protocol can be used as `Key` type,
+/// including all of Swift’s basic types.
+/// You can use your own custom types as hash table keys by making them conform to the
+/// `Hashable` protocol.
+///
+/// Getting and Setting Hash Table Values
+/// =====================================
+///
+/// The most common way to access values in an hash table is to use a key as a subscript.
+/// Subscripting with a key takes the following form:
+/// ```
+///     print(occurencies["access"])
+///     // Prints "Optional(1)"
+/// ```
+///
+/// Subscripting an hash table with a key returns an optional value, because it might not hold a
+/// value for the key spedified in the subscript.
+/// The next example uses key-based subscripting of the occurencies hash table with on key
+/// that exist in the hash table and one that does not:
+/// ```
+///     let words = ["hash", "contains"]
+///     for word in words {
+///         if let times = occurencies[word] {
+///             print("Times word \(word) appears: \(times)")
+///         } else {
+///             print("Unknown word \(word)")
+///         }
+///     }
+///     // Prints "Times word hash appears: 1"
+///     // Prints "Unknown word: contains"
+///```
+///
+/// You can also update, modify, or remove keys and values
+/// from an hash table using the key-based subscript.
+/// To add a new key-value pair, assign a value to a key that isn’t yet a part of the hash table:
+/// ```
+///     occurencies["contains"] = 1
+///     print(occurencies["contains"])
+///     // Prints "Optional(1)"
+/// ```
+///
+/// Update an existing value by assigning a new value to a key that
+/// already exists in the hash table.
+/// If you assign nil to an existing key, the key and its associated value are removed.
+/// The following example updates the value for the "contains" key to be `2` and removes
+/// the key-value pair for the "An" key entirely:
+/// ```
+///     occurencies["contains"] = 2
+///     occurencies["An"] = nil
+///     print(responseMessages)
+///     // Prints "["hash": 1, "table": 1, "provides": 1, "fast": 1, "access": 1, "contains": 2]"
+/// ```
+///
+/// In a mutable hash table instance, you can modify in place a value that
+/// you’ve accessed through a keyed subscript.
+/// The code sample below declares an hash table called interestingNumbers
+/// with string keys and values that are integer arrays,
+/// then sorts each array in-place in descending order:
+/// ```
+///     var interestingNumbers: SeparateChainingHashTable<String, Array<Int>> = [
+///             "primes": [2, 3, 5, 7, 11, 13, 17],
+///             "triangular": [1, 3, 6, 10, 15, 21, 28],
+///             "hexagonal": [1, 6, 15, 28, 45, 66, 91]
+///         ]
+///     for key in interestingNumbers.keys {
+///         interestingNumbers[key]?.sort(by: >)
+///     }
+///
+///     print(interestingNumbers["primes"]!)
+///     // Prints "[17, 13, 11, 7, 5, 3, 2]"
+/// ```
+///
+/// Iterating Over the Contents of an Hash Table
+/// ============================================
+///
+/// Every hash table is an unordered collection of key-value pairs.
+/// You can iterate over an hash tabel using a for-in loop, decomposing
+/// each key-value pair into the elements of a tuple:
+/// ```
+///     let imagePaths: SeparateChainingHashTable<String, String> = [
+///         "star": "/glyphs/star.png",
+///         "portrait": "/images/content/portrait.jpg",
+///         "spacer": "/images/shared/spacer.gif"
+///     ]
+///
+///     for (name, path) in imagePaths {
+///         print("The path to '\(name)' is '\(path)'.")
+///     }
+///     // Prints "The path to 'star' is '/glyphs/star.png'."
+///     // Prints "The path to 'portrait' is '/images/content/portrait.jpg'."
+///     // Prints "The path to 'spacer' is '/images/shared/spacer.gif'."
+/// ```
+///
+/// The order of key-value pairs in an hash table is unpredictable
+/// between mutations is unpredictable.
+/// You can search an hash table’s contents for a particular value using
+/// the `contains(where:)` or `firstIndex(where:)`
+/// methods supplied by default implementation.
+///  The following example checks to see if imagePaths contains any paths
+///  in the "/glyphs" directory:
+/// ```
+///     let glyphIndex = imagePaths
+///         .firstIndex(where: { $0.value.hasPrefix("/glyphs") })
+///     if let index = glyphIndex {
+///         print("The '\(imagePaths[index].key)' image is a glyph.")
+///     } else {
+///         print("No glyphs found!")
+///     }
+///     // Prints "The 'star' image is a glyph.")
+/// ```
+///
+/// Note that in this example, imagePaths is subscripted using an hash table index.
+/// Unlike the key-based subscript, the index-based subscript returns the corresponding
+/// key-value pair as a non-optional tuple:
+/// ```
+///     print(imagePaths[glyphIndex!])
+///     // Prints "("star", "/glyphs/star.png")"
+/// ```
+///
+/// An hash table’s indices is invalidated across any mutation to the hash table.
+/// When you know how many new values you’re adding to a hash table,
+/// use the `init(minimumCapacity:)` initializer to allocate the correct amount of buffer.
 public struct SeparateChainingHashTable<Key: Hashable, Value> {
     public typealias Element = (key: Key, value: Value)
     
@@ -166,6 +312,17 @@ extension SeparateChainingHashTable {
             }
             
             updateValue(v, forKey: k)
+        }
+    }
+    
+    public subscript(key: Key, default defaultValue: @autoclosure () -> Value) -> Value {
+        get {
+            buffer?.getValue(forKey: key) ?? defaultValue()
+        }
+        
+        set {
+            makeUniqueEventuallyIncreasingCapacity()
+            buffer!.setValue(newValue, forKey: key)
         }
     }
     
