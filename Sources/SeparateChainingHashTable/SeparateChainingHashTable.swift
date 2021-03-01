@@ -29,167 +29,84 @@ import Foundation
 
 /// A collection whose elements are key-value pairs, stored via a separate chaining hash table.
 ///
-/// An hash table provides fast access to the entries it contains.
-/// Each entry in the table is identified using its key, which is a hashable type.
-/// You use that key to retrieve the corresponding value, which can be any object.
-/// Similar data types are also known as hashes or associated arrays.
-/// Create a new hastable by using a dictionary literal.
-/// In this example is shown how to create an hash table via dictionary literal:
-/// ```
-///     let occurencies: SeparateChainingHashTable<String, Int> = [
-///         "An" : 1,
-///         "hash" : 1,
-///         "table" : 1,
-///         "provides" : 1
-///         "fast" : 1
-///         "access" : 1
-///     ]
-/// ```
-/// The `Key` type for this hash table is `String`, and the `Value` type is `Int`.
-/// These are a couple of examples showing how create an empty hash table:
-/// ```
-///     var empty = SeparateChainignHashTable<String, Int>()
-///     var otherEmpty: SeparateChainingHashTable<String, Int> = [ : ]
-/// ```
-/// Any type that conforms to the `Hashable` protocol can be used as `Key` type,
-/// including all of Swift’s basic types.
-/// You can use your own custom types as hash table keys by making them conform to the
-/// `Hashable` protocol.
-///
-/// Getting and Setting Hash Table Values
-/// =====================================
-///
-/// The most common way to access values in an hash table is to use a key as a subscript.
-/// Subscripting with a key takes the following form:
-/// ```
-///     print(occurencies["access"])
-///     // Prints "Optional(1)"
-/// ```
-///
-/// Subscripting an hash table with a key returns an optional value, because it might not hold a
-/// value for the key spedified in the subscript.
-/// The next example uses key-based subscripting of the occurencies hash table with on key
-/// that exist in the hash table and one that does not:
-/// ```
-///     let words = ["hash", "contains"]
-///     for word in words {
-///         if let times = occurencies[word] {
-///             print("Times word \(word) appears: \(times)")
-///         } else {
-///             print("Unknown word \(word)")
-///         }
-///     }
-///     // Prints "Times word hash appears: 1"
-///     // Prints "Unknown word: contains"
-///```
-///
-/// You can also update, modify, or remove keys and values
-/// from an hash table using the key-based subscript.
-/// To add a new key-value pair, assign a value to a key that isn’t yet a part of the hash table:
-/// ```
-///     occurencies["contains"] = 1
-///     print(occurencies["contains"])
-///     // Prints "Optional(1)"
-/// ```
-///
-/// Update an existing value by assigning a new value to a key that
-/// already exists in the hash table.
-/// If you assign nil to an existing key, the key and its associated value are removed.
-/// The following example updates the value for the "contains" key to be `2` and removes
-/// the key-value pair for the "An" key entirely:
-/// ```
-///     occurencies["contains"] = 2
-///     occurencies["An"] = nil
-///     print(responseMessages)
-///     // Prints "["hash": 1, "table": 1, "provides": 1, "fast": 1, "access": 1, "contains": 2]"
-/// ```
-///
-/// In a mutable hash table instance, you can modify in place a value that
-/// you’ve accessed through a keyed subscript.
-/// The code sample below declares an hash table called interestingNumbers
-/// with string keys and values that are integer arrays,
-/// then sorts each array in-place in descending order:
-/// ```
-///     var interestingNumbers: SeparateChainingHashTable<String, Array<Int>> = [
-///             "primes": [2, 3, 5, 7, 11, 13, 17],
-///             "triangular": [1, 3, 6, 10, 15, 21, 28],
-///             "hexagonal": [1, 6, 15, 28, 45, 66, 91]
-///         ]
-///     for key in interestingNumbers.keys {
-///         interestingNumbers[key]?.sort(by: >)
-///     }
-///
-///     print(interestingNumbers["primes"]!)
-///     // Prints "[17, 13, 11, 7, 5, 3, 2]"
-/// ```
-///
-/// Iterating Over the Contents of an Hash Table
-/// ============================================
-///
-/// Every hash table is an unordered collection of key-value pairs.
-/// You can iterate over an hash tabel using a for-in loop, decomposing
-/// each key-value pair into the elements of a tuple:
-/// ```
-///     let imagePaths: SeparateChainingHashTable<String, String> = [
-///         "star": "/glyphs/star.png",
-///         "portrait": "/images/content/portrait.jpg",
-///         "spacer": "/images/shared/spacer.gif"
-///     ]
-///
-///     for (name, path) in imagePaths {
-///         print("The path to '\(name)' is '\(path)'.")
-///     }
-///     // Prints "The path to 'star' is '/glyphs/star.png'."
-///     // Prints "The path to 'portrait' is '/images/content/portrait.jpg'."
-///     // Prints "The path to 'spacer' is '/images/shared/spacer.gif'."
-/// ```
-///
-/// The order of key-value pairs in an hash table is unpredictable
-/// between mutations is unpredictable.
-/// You can search an hash table’s contents for a particular value using
-/// the `contains(where:)` or `firstIndex(where:)`
-/// methods supplied by default implementation.
-///  The following example checks to see if imagePaths contains any paths
-///  in the "/glyphs" directory:
-/// ```
-///     let glyphIndex = imagePaths
-///         .firstIndex(where: { $0.value.hasPrefix("/glyphs") })
-///     if let index = glyphIndex {
-///         print("The '\(imagePaths[index].key)' image is a glyph.")
-///     } else {
-///         print("No glyphs found!")
-///     }
-///     // Prints "The 'star' image is a glyph.")
-/// ```
-///
-/// Note that in this example, imagePaths is subscripted using an hash table index.
-/// Unlike the key-based subscript, the index-based subscript returns the corresponding
-/// key-value pair as a non-optional tuple:
-/// ```
-///     print(imagePaths[glyphIndex!])
-///     // Prints "("star", "/glyphs/star.png")"
-/// ```
-///
-/// An hash table’s indices is invalidated across any mutation to the hash table.
-/// When you know how many new values you’re adding to a hash table,
-/// use the `init(minimumCapacity:)` initializer to allocate the correct amount of buffer.
+/// `SeparateChainingHashTable` shares the same functionalities
+/// of Swift `Dictionary`, except for invalidating its `Indicies` every time
+/// a call to a mutating method was done —no matter if a mutation has really took effect or not.
 public struct SeparateChainingHashTable<Key: Hashable, Value> {
+    /// The element type of an hash table: a tuple containing an individual
+    /// key-value pair.
     public typealias Element = (key: Key, value: Value)
-    
-    final class ID {  }
     
     private(set) var buffer: HashTableBuffer<Key, Value>? = nil
     
     private(set) var id = ID()
     
+    /// The total number of key-value pairs that the hash table can contain without
+    /// allocating new storage.
+    ///
+    /// - Complexity: O(1)
     @inline(__always)
     public var capacity: Int { buffer?.capacity ?? 0 }
     
+    /// The number of key-value pairs in the hash table.
+    ///
+    /// - Complexity: O(1).
     @inline(__always)
     public var count: Int { buffer?.count ?? 0 }
     
+    /// A Boolean value that indicates whether the hash table is empty.
+    ///
+    /// Hash table are empty when created with an initializer or an empty
+    /// dictionary literal.
+    ///
+    ///     var frequencies: SeparateChainingHashTable<String, Int> = [:]
+    ///     print(frequencies.isEmpty)
+    ///     // Prints "true"
+    ///
+    /// - Complexity: O(1).
     @inline(__always)
     public var isEmpty: Bool { buffer?.isEmpty ?? true }
+    
+    /// An array containing just the keys of the hash table.
+    ///
+    /// When iterated over, keys appear in this collection in the same order as
+    /// they occur in the hash table's key-value pairs. Each key in the keys
+    /// collection has a unique value.
+    ///
+    ///     let countryCodes: SeparateChainingHashTable<String, String> = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+    ///     print(countryCodes)
+    ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+    ///
+    ///     for k in countryCodes.keys {
+    ///         print(k)
+    ///     }
+    ///     // Prints "BR"
+    ///     // Prints "JP"
+    ///     // Prints "GH"
+    ///
+    /// - Complexity: O(*n*) where *n* is lenght of this hash table.
+    @inline(__always)
+    public var keys: [Key] { buffer?.map { $0.key } ?? [] }
+    
+    /// An array containing just the values of the hash table.
+    ///
+    /// When iterated over, values appear in this collection in the same order as
+    /// they occur in the hash table's key-value pairs.
+    ///
+    ///     let countryCodes: SeparateChainingHashTable<String, String> = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+    ///     print(countryCodes)
+    ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
+    ///
+    ///     for v in countryCodes.values {
+    ///         print(v)
+    ///     }
+    ///     // Prints "Brazil"
+    ///     // Prints "Japan"
+    ///     // Prints "Ghana"
+    ///
+    /// - Complexity: O(*n*) where *n* is lenght of this hash table.
+    @inline(__always)
+    public var values: [Value] { buffer?.map { $0.value } ?? [] }
     
     @inline(__always)
     fileprivate var freeCapacity: Int { capacity - count }
@@ -199,8 +116,19 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
         HashTableBuffer<Key, Value>.minTableCapacity
     }
     
+    /// Creates an empty hash table.
     public init() {  }
     
+    /// Creates an empty hash table with preallocated space for at least the
+    /// specified number of elements.
+    ///
+    /// Use this initializer to avoid intermediate reallocations of an hash table's
+    /// storage buffer when you know how many key-value pairs you are adding to an
+    /// hash table after creation.
+    ///
+    /// - Parameter minimumCapacity: The minimum number of key-value pairs that
+    ///   the newly created hash table should be able to store without
+    ///   reallocating its storage buffer.
     public init(minimumCapacity k: Int) {
         precondition(k >= 0, "minimumCapacity must not be negative")
         guard k > 0 else { return }
@@ -210,12 +138,65 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
         self.buffer = HashTableBuffer(minimumCapacity: minimumCapacity)
     }
     
+    /// Creates a new hash table from the key-value pairs in the given sequence.
+    ///
+    /// You use this initializer to create an hash table when you have a sequence
+    /// of key-value tuples with unique keys. Passing a sequence with duplicate
+    /// keys to this initializer results in a runtime error. If your
+    /// sequence might have duplicate keys, use the
+    /// `init(_:uniquingKeysWith:)` initializer instead.
+    ///
+    /// The following example creates a new hash table using an array of strings
+    /// as the keys and the integers in a countable range as the values:
+    ///
+    ///     let digitWords = ["one", "two", "three", "four", "five"]
+    ///     let wordToValue = SeparateChainingHAshTable(uniqueKeysWithValues: zip(digitWords, 1...5))
+    ///     print(wordToValue["three"]!)
+    ///     // Prints "3"
+    ///     print(wordToValue)
+    ///     // Prints "["three": 3, "four": 4, "five": 5, "one": 1, "two": 2]"
+    ///
+    /// - Parameter keysAndValues: A sequence of key-value pairs to use for
+    ///   the new hash table. Every key in `keysAndValues` must be unique.
+    /// - Returns: A new hash table initialized with the elements of
+    ///   `keysAndValues`.
+    /// - Precondition: The sequence must not have duplicate keys.
     public init<S: Sequence>(uniqueKeysWithValues keysAndValues: S) where S.Iterator.Element == Element {
         self.init(keysAndValues) { _, _ in
             preconditionFailure("keys must be unique")
         }
     }
     
+    /// Creates a new hash table from the key-value pairs in the given sequence,
+    /// using a combining closure to determine the value for any duplicate keys.
+    ///
+    /// You use this initializer to create an hash table when you have a sequence
+    /// of key-value tuples that might have duplicate keys. As the hash table is
+    /// built, the initializer calls the `combine` closure with the current and
+    /// new values for any duplicate keys. Pass a closure as `combine` that
+    /// returns the value to use in the resulting hash table: the closure can
+    /// choose between the two values, combine them to produce a new value, or
+    /// even throw an error.
+    ///
+    /// The following example shows how to choose the first and last values for
+    /// any duplicate keys:
+    ///
+    ///     let pairsWithDuplicateKeys = [("a", 1), ("b", 2), ("a", 3), ("b", 4)]
+    ///
+    ///     let firstValues = SeparateChainingHashTable(pairsWithDuplicateKeys,
+    ///                                  uniquingKeysWith: { (first, _) in first })
+    ///     // ["b": 2, "a": 1]
+    ///
+    ///     let lastValues = Dictionary(pairsWithDuplicateKeys,
+    ///                                 uniquingKeysWith: { (_, last) in last })
+    ///     // ["b": 4, "a": 3]
+    ///
+    /// - Parameters:
+    ///   - keysAndValues:  A sequence of key-value pairs to use for
+    ///                     the new hash table
+    ///   - combine:    A closure that is called with the values for any
+    ///                 duplicate keys that are encountered.
+    ///                 The closure returns the desired value for the final hash table.
     public init<S>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Iterator.Element == Element {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             self.init(other)
@@ -254,6 +235,28 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
         self.init(buffer: newBuffer)
     }
     
+    /// Creates a new hash table whose keys are the groupings returned by the
+    /// given closure and whose values are arrays of the elements that returned
+    /// each key.
+    ///
+    /// The arrays in the "values" position of the new hash table each contain at
+    /// least one element, with the elements in the same order as the source
+    /// sequence.
+    ///
+    /// The following example declares an array of names, and then creates an
+    /// hash table from that array by grouping the names by first letter:
+    ///
+    ///     let students = ["Kofi", "Abena", "Efua", "Kweku", "Akosua"]
+    ///     let studentsByLetter = SeparateChainingHashTable(grouping: students, by: { $0.first! })
+    ///     // ["E": ["Efua"], "K": ["Kofi", "Kweku"], "A": ["Abena", "Akosua"]]
+    ///
+    /// The new `studentsByLetter` hash table has three entries, with students'
+    /// names grouped by the keys `"E"`, `"K"`, and `"A"`.
+    ///
+    /// - Parameters:
+    ///   - values: A sequence of values to group into an hash table.
+    ///   - keyForValue: A closure that returns a key for each element in
+    ///     `values`.
     public init<S>(grouping values: S, by keyForValue: (S.Element) throws -> Key) rethrows where Value == [S.Element], S : Sequence {
         var newBuffer: HashTableBuffer<Key, Value>? = nil
         let done: Bool = try values
@@ -301,6 +304,51 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
 
 // MARK: - C.R.U.D. methods
 extension SeparateChainingHashTable {
+    /// Accesses the value associated with the given key for reading and writing.
+    ///
+    /// This *key-based* subscript returns the value for the given key if the key
+    /// is found in the hash table, or `nil` if the key is not found.
+    /// The setter of this subscript invalidates all indices of the hash table.
+    ///
+    /// The following example creates a new hash table and prints the value of a
+    /// key found in the has table (`"Coral"`) and a key not found in the
+    /// hash table (`"Cerise"`).
+    ///
+    ///     var hues: SepartateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+    ///     print(hues["Coral"])
+    ///     // Prints "Optional(16)"
+    ///     print(hues["Cerise"])
+    ///     // Prints "nil"
+    ///
+    /// When you assign a value for a key and that key already exists, the
+    /// hash table overwrites the existing value. If the hash table doesn't
+    /// contain the key, the key and value are added as a new key-value pair.
+    ///
+    /// Here, the value for the key `"Coral"` is updated from `16` to `18` and a
+    /// new key-value pair is added for the key `"Cerise"`.
+    ///
+    ///     hues["Coral"] = 18
+    ///     print(hues["Coral"])
+    ///     // Prints "Optional(18)"
+    ///
+    ///     hues["Cerise"] = 330
+    ///     print(hues["Cerise"])
+    ///     // Prints "Optional(330)"
+    ///
+    /// If you assign `nil` as the value for the given key, the hash table
+    /// removes that key and its associated value.
+    ///
+    /// In the following example, the key-value pair for the key `"Aquamarine"`
+    /// is removed from the hash table by assigning `nil` to the key-based
+    /// subscript.
+    ///
+    ///     hues["Aquamarine"] = nil
+    ///     print(hues)
+    ///     // Prints "["Coral": 18, "Heliotrope": 296, "Cerise": 330]"
+    ///
+    /// - Parameter key: The key to find in the hash table.
+    /// - Returns: The value associated with `key` if `key` is in the hash table;
+    ///   otherwise, `nil`.
     public subscript(_ k: Key) -> Value? {
         get { getValue(forKey: k) }
         
@@ -315,6 +363,59 @@ extension SeparateChainingHashTable {
         }
     }
     
+    /// Accesses the value with the given key. If the hash table doesn't contain
+    /// the given key, accesses the provided default value as if the key and
+    /// default value existed in the hash table.
+    ///
+    /// Use this subscript when you want either the value for a particular key
+    /// or, when that key is not present in the hash table, a default value.
+    /// The setter of this subscript invalidates all indices of the hash table.
+    /// This example uses the subscript with a message to use in case an HTTP response
+    /// code isn't recognized:
+    ///
+    ///     var responseMessages: SeparateChainingHashTable<Int, String> = [
+    ///         200: "OK",
+    ///         403: "Access forbidden",
+    ///         404: "File not found",
+    ///         500: "Internal server error"
+    ///     ]
+    ///
+    ///     let httpResponseCodes = [200, 403, 301]
+    ///     for code in httpResponseCodes {
+    ///         let message = responseMessages[code, default: "Unknown response"]
+    ///         print("Response \(code): \(message)")
+    ///     }
+    ///     // Prints "Response 200: OK"
+    ///     // Prints "Response 403: Access Forbidden"
+    ///     // Prints "Response 301: Unknown response"
+    ///
+    /// When an hash table's `Value` type has value semantics, you can use this
+    /// subscript to perform in-place operations on values in the hash table.
+    /// The following example uses this subscript while counting the occurrences
+    /// of each letter in a string:
+    ///
+    ///     let message = "Hello, Elle!"
+    ///     var letterCounts: SeparateChainingHashTable<Character, Int> = [:]
+    ///     for letter in message {
+    ///         letterCounts[letter, default: 0] += 1
+    ///     }
+    ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
+    ///
+    /// When `letterCounts[letter, defaultValue: 0] += 1` is executed with a
+    /// value of `letter` that isn't already a key in `letterCounts`, the
+    /// specified default value (`0`) is returned from the subscript,
+    /// incremented, and then added to the hash table under that key.
+    ///
+    /// - Note: Do not use this subscript to modify hash table values if the
+    ///   dictionary's `Value` type is a class. In that case, the default value
+    ///   and key are not written back to the hash table after an operation.
+    ///
+    /// - Parameters:
+    ///   - key: The key to look up in the hash table.
+    ///   - defaultValue:   The default value to use if `key` doesn't exist
+    ///                     in the hash table.
+    /// - Returns:  The value associated with `key` in the hash table;
+    ///             otherwise, `defaultValue`.
     public subscript(key: Key, default defaultValue: @autoclosure () -> Value) -> Value {
         get {
             buffer?.getValue(forKey: key) ?? defaultValue()
@@ -326,10 +427,49 @@ extension SeparateChainingHashTable {
         }
     }
     
+    /// Returns the value associated to the the given key. If such key doesn't exists in the hash
+    /// table, then returns `nil`.
+    ///
+    /// - Parameter forKey: The key to lookup in the hash table.
+    /// - Returns:  The value associated to the given key, if such key exists in the
+    ///             hash table; otherwise `nil`.
     public func getValue(forKey k: Key) -> Value? {
         buffer?.getValue(forKey: k)
     }
     
+    /// Updates the value stored in the hash table for the given key, or adds a
+    /// new key-value pair if the key does not exist.
+    ///
+    /// Use this method instead of key-based subscripting when you need to know
+    /// whether the new value supplants the value of an existing key. If the
+    /// value of an existing key is updated, `updateValue(_:forKey:)` returns
+    /// the original value. This method invalidates all indices of the hash table.
+    ///
+    ///     var hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+    ///
+    ///     if let oldValue = hues.updateValue(18, forKey: "Coral") {
+    ///         print("The old value of \(oldValue) was replaced with a new one.")
+    ///     }
+    ///     // Prints "The old value of 16 was replaced with a new one."
+    ///
+    /// If the given key is not present in the hash table, this method adds the
+    /// key-value pair and returns `nil`.
+    ///
+    ///     if let oldValue = hues.updateValue(330, forKey: "Cerise") {
+    ///         print("The old value of \(oldValue) was replaced with a new one.")
+    ///     } else {
+    ///         print("No value was found in the dictionary for that key.")
+    ///     }
+    ///     // Prints "No value was found in the dictionary for that key."
+    ///
+    /// - Parameters:
+    ///   - value: The new value to add to the hash table.
+    ///   - key:    The key to associate with `value`. If `key` already exists in
+    ///             the hash table, `value` replaces the existing associated value.
+    ///             If `key` isn't already a key of the hash table,
+    ///             the `(key, value)` pair is added.
+    /// - Returns:  The value that was replaced, or `nil` if a new key-value pair
+    ///             was added.
     @discardableResult
     public mutating func updateValue(_ v: Value, forKey k: Key) -> Value? {
         makeUniqueEventuallyIncreasingCapacity()
@@ -337,6 +477,32 @@ extension SeparateChainingHashTable {
         return buffer!.updateValue(v, forKey: k)
     }
     
+    /// Removes the given key and its associated value from the hash table.
+    ///
+    /// If the key is found in the hash table, this method returns the key's
+    /// associated value. This method invalidates all indices of the hash table.
+    ///
+    ///     var hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+    ///     if let value = hues.removeValue(forKey: "Coral") {
+    ///         print("The value \(value) was removed.")
+    ///     }
+    ///     // Prints "The value 16 was removed."
+    ///
+    /// If the key isn't found in the hash table, `removeValue(forKey:)` returns
+    /// `nil`.
+    ///
+    ///     if let value = hues.removeValueForKey("Cerise") {
+    ///         print("The value \(value) was removed.")
+    ///     } else {
+    ///         print("No value found for that key.")
+    ///     }
+    ///     // Prints "No value found for that key.""
+    ///
+    /// - Parameter key: The key to remove along with its associated value.
+    /// - Returns:  The value that was removed, or `nil` if the key was not
+    ///             present in the hash table.
+    ///
+    /// - Complexity: Amortized O(1).
     @discardableResult
     public mutating func removeValue(forKey k: Key) -> Value? {
         makeUniqueEventuallyReducingCapacity()
@@ -344,6 +510,18 @@ extension SeparateChainingHashTable {
         return buffer?.removeElement(withKey: k)
     }
     
+    /// Removes all key-value pairs from the hash table.
+    ///
+    /// Calling this method invalidates all indices of the hash table.
+    ///
+    /// - Parameter keepCapacity:   Whether the hash table should keep its
+    ///                             underlying buffer.
+    ///                             If you pass `true`, the operation
+    ///                             preserves the buffer capacity that
+    ///                             the collection has, otherwise the underlying
+    ///                             buffer is released.  The default is `false`.
+    ///
+    /// - Complexity: Amortized O(*n*), where *n* is the lenght of the hash table.
     public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
         id = ID()
         guard buffer != nil else { return }
@@ -362,11 +540,50 @@ extension SeparateChainingHashTable {
 
 // MARK: - Other methods
 extension SeparateChainingHashTable {
+    /// Reserves enough space to store the specified number of key-value pairs.
+    ///
+    /// If you are adding a known number of key-value pairs to an hash table, use this
+    /// method to avoid multiple reallocations. This method ensures that the
+    /// hash table has unique, mutable, contiguous storage, with space allocated
+    /// for at least the requested number of key-value pairs.
+    /// This method invalidates all indices of the hash table.
+    ///
+    /// - Parameter minimumCapacity:    The requested number of
+    ///                                 key-value pairs to store.
+    /// - Complexity: O(*k*) where *k* is the final capacity for the hash table.
     public mutating func reserveCapacity(_ minimumCapacity: Int) {
         precondition(minimumCapacity >= 0, "minimumCapacity must not be negative")
         makeUniqueReserving(minimumCapacity: minimumCapacity)
     }
     
+    /// Merges the key-value pairs in the given sequence into the hash table,
+    /// using a combining closure to determine the value for any duplicate keys.
+    ///
+    /// Use the `combine` closure to select a value to use in the updated
+    /// hash table, or to combine existing and new values. As the key-value
+    /// pairs are merged with the hash table, the `combine` closure is called
+    /// with the current and new values for any duplicate keys that are
+    /// encountered.
+    ///
+    /// This method invalidates all indices of the hash table.
+    /// This example shows how to choose the current or new values for any
+    /// duplicate keys:
+    ///
+    ///     var dictionary: SeparateChainingHashTable<String, Key> = ["a": 1, "b": 2]
+    ///
+    ///     // Keeping existing value for key "a":
+    ///     dictionary.merge(zip(["a", "c"], [3, 4])) { (current, _) in current }
+    ///     // ["b": 2, "a": 1, "c": 4]
+    ///
+    ///     // Taking the new value for key "a":
+    ///     dictionary.merge(zip(["a", "d"], [5, 6])) { (_, new) in new }
+    ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
+    ///
+    /// - Parameters:
+    ///   - other:  A sequence of key-value pairs.
+    ///   - combine:    A closure that takes the current and new values for any
+    ///                 duplicate keys. The closure returns the desired value
+    ///                 for the final hash table.
     public mutating func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             try merge(other, uniquingKeysWith: combine)
@@ -376,6 +593,36 @@ extension SeparateChainingHashTable {
         }
     }
     
+    /// Merges the given hash table into this hash table, using a combining
+    /// closure to determine the value for any duplicate keys.
+    ///
+    /// Use the `combine` closure to select a value to use in the updated
+    /// hash table, or to combine existing and new values. As the key-values
+    /// pairs in `other` are merged with this hash table, the `combine` closure
+    /// is called with the current and new values for any duplicate keys that
+    /// are encountered.
+    ///
+    /// This method invalidates all indices of the hash table.
+    /// This example shows how to choose the current or new values for any
+    /// duplicate keys:
+    ///
+    ///     var dictionary: SeparateChainingHashTable<String, Int> = ["a": 1, "b": 2]
+    ///     var other = SeparateChainingHashTable<String, Int> = ["a": 3, "c": 4]
+    ///
+    ///     // Keeping existing value for key "a":
+    ///     dictionary.merge(other) { (current, _) in current }
+    ///     // ["b": 2, "a": 1, "c": 4]
+    ///
+    ///     // Taking the new value for key "a":
+    ///     other = ["a": 5, "d": 6]
+    ///     dictionary.merge(other) { (_, new) in new }
+    ///     // ["b": 2, "a": 5, "c": 4, "d": 6]
+    ///
+    /// - Parameters:
+    ///   - other:  An hash table to merge.
+    ///   - combine:    A closure that takes the current and new values for any
+    ///                 duplicate keys. The closure returns the desired value
+    ///                 for the final hash table.
     public mutating func merge(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
         makeUnique()
         guard !other.isEmpty else { return }
@@ -383,6 +630,36 @@ extension SeparateChainingHashTable {
         try! buffer!.merge(other.buffer!, uniquingKeysWith: combine)
     }
     
+    /// Creates an hash table by merging the given hash table into this
+    /// hash table, using a combining closure to determine the value for
+    /// duplicate keys.
+    ///
+    /// Use the `combine` closure to select a value to use in the returned
+    /// hash table, or to combine existing and new values. As the key-value
+    /// pairs in `other` are merged with this hash table, the `combine` closure
+    /// is called with the current and new values for any duplicate keys that
+    /// are encountered.
+    ///
+    /// This example shows how to choose the current or new values for any
+    /// duplicate keys:
+    ///
+    ///     let dictionary: SeparateChainingHashTable<String, Int> = ["a": 1, "b": 2]
+    ///     let other: SeparateChianingHashTable<String, Int> = ["a": 3, "b": 4]
+    ///
+    ///     let keepingCurrent = dictionary.merging(other)
+    ///           { (current, _) in current }
+    ///     // ["b": 2, "a": 1]
+    ///     let replacingCurrent = dictionary.merging(other)
+    ///           { (_, new) in new }
+    ///     // ["b": 4, "a": 3]
+    ///
+    /// - Parameters:
+    ///   - other:  An hash table to merge.
+    ///   - combine:    A closure that takes the current and new values for any
+    ///                 duplicate keys. The closure returns the desired value
+    ///                 for the final hash table.
+    /// - Returns:  A new hash table with the combined keys and values
+    ///             of this hash table and `other`.
     func merging(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable {
         guard !isEmpty else { return other }
         
@@ -394,6 +671,34 @@ extension SeparateChainingHashTable {
         return SeparateChainingHashTable(buffer: mergedBuffer)
     }
     
+    /// Creates an hash table by merging key-value pairs in a sequence into the
+    /// hash table, using a combining closure to determine the value for
+    /// duplicate keys.
+    ///
+    /// Use the `combine` closure to select a value to use in the returned
+    /// hash table, or to combine existing and new values. As the key-value
+    /// pairs are merged with the hash table, the `combine` closure is called
+    /// with the current and new values for any duplicate keys that are
+    /// encountered.
+    ///
+    /// This example shows how to choose the current or new values for any
+    /// duplicate keys:
+    ///
+    ///     let dictionary: SeparateChainingHashTable<String, Int> = ["a": 1, "b": 2]
+    ///     let newKeyValues = zip(["a", "b"], [3, 4])
+    ///
+    ///     let keepingCurrent = dictionary.merging(newKeyValues) { (current, _) in current }
+    ///     // ["b": 2, "a": 1]
+    ///     let replacingCurrent = dictionary.merging(newKeyValues) { (_, new) in new }
+    ///     // ["b": 4, "a": 3]
+    ///
+    /// - Parameters:
+    ///   - other:  A sequence of key-value pairs.
+    ///   - combine:    A closure that takes the current and new values for any
+    ///                 duplicate keys. The closure returns the desired value
+    ///                 for the final hash table.
+    /// - Returns:  A new hash table with the combined keys and values
+    ///             of this hash table and `other`.
     func merging<S>(_ other: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable where S : Sequence, S.Element == Element {
         if let otherHT = other as? SeparateChainingHashTable {
             
@@ -412,24 +717,79 @@ extension SeparateChainingHashTable {
         return SeparateChainingHashTable(buffer: mergedBuffer)
     }
     
+    /// Returns a new hash table containing the keys of this hash table with the
+    /// values transformed by the given closure.
+    ///
+    /// - Parameter transform: A closure that transforms a value. `transform`
+    ///   accepts each value of the hash table as its parameter and returns a
+    ///   transformed value of the same or of a different type.
+    /// - Returns:  An hash table containing the keys and transformed values
+    ///             of this hash table.
+    ///
+    /// - Complexity: O(*n*), where *n* is the length of the hash table.
     public func mapValues<T>(_ transform: (Value) throws -> T) rethrows -> SeparateChainingHashTable<Key, T> {
         let mappedBuffer = try buffer?.mapValues(transform)
         
         return SeparateChainingHashTable<Key, T>(buffer: mappedBuffer)
     }
     
+    /// Returns a new hash table containing only the key-value pairs that have
+    /// non-`nil` values as the result of transformation by the given closure.
+    ///
+    /// Use this method to receive an hash table with non-optional values when
+    /// your transformation produces optional values.
+    ///
+    /// In this example, note the difference in the result of using `mapValues`
+    /// and `compactMapValues` with a transformation that returns an optional
+    /// `Int` value.
+    ///
+    ///     let data: SeparateChainingHashTable<String, String> = ["a": "1", "b": "three", "c": "///4///"]
+    ///
+    ///     let m: SeparateChainingHashTable<String, Int?> = data.mapValues { str in Int(str) }
+    ///     // ["a": 1, "b": nil, "c": nil]
+    ///
+    ///     let c: SeparateChainingHashTable<String, Int> = data.compactMapValues { str in Int(str) }
+    ///     // ["a": 1]
+    ///
+    /// - Parameter transform:  A closure that transforms a value. `transform`
+    ///                         accepts each value of the hash table as
+    ///                         its parameter and returns an optional transformed
+    ///                         value of the same or of a different type.
+    /// - Returns:  An hash table containing the keys and non-`nil` transformed values
+    ///             of this hash table.
+    ///
+    /// - Complexity:   O(*m* + *n*), where *n* is the length of the original
+    ///                 hash table and *m* is the length of the resulting hash table.
     public func compactMapValues<T>(_ transform: (Value) throws -> T?) rethrows -> SeparateChainingHashTable<Key, T> {
         let mappedBuffer = try buffer?.compactMapValues(transform)
         
         return SeparateChainingHashTable<Key, T>(buffer: mappedBuffer)
     }
     
+    /// Returns a new hash table containing the key-value pairs of the hash table
+    /// that satisfy the given predicate.
+    ///
+    /// - Parameter isIncluded: A closure that takes a key-value pair as its
+    ///   argument and returns a Boolean value indicating whether the pair
+    ///   should be included in the returned hash table.
+    /// - Returns: An hash table of the key-value pairs that `isIncluded` allows.
     public func filter(_ isIncluded: (Element) throws -> Bool) rethrows -> SeparateChainingHashTable {
         let filtered = try self.buffer?.filter(isIncluded)
         
         return SeparateChainingHashTable(buffer: filtered)
     }
     
+    /// Removes and returns the key-value pair at the specified index.
+    ///
+    /// Calling this method invalidates any existing indices for use with this
+    /// hash table.
+    ///
+    /// - Parameter index:  The position of the key-value pair to remove. `index`
+    ///                     must be a valid index of the hash table,
+    ///                     and must not equal the hash table's end index.
+    /// - Returns: The key-value pair that correspond to `index`.
+    ///
+    /// - Complexity: Amortized O(1).
     @discardableResult
     public mutating func remove(at index: Index) -> Element {
         precondition(index.isValidFor(self), "invalid index for this hash table")
@@ -508,8 +868,28 @@ extension SeparateChainingHashTable {
 
 // MARK: - Sequence conformance
 extension SeparateChainingHashTable: Sequence {
+    /// A value equal to the number of key-value pairs stored in the hash table.
+    ///
+    /// - Complexity: O(1).
     public var underestimatedCount: Int { count }
     
+    /// Returns an iterator over the hash table's key-value pairs.
+    ///
+    /// Iterating over an hash table yields the key-value pairs as two-element
+    /// tuples. You can decompose the tuple in a `for`-`in` loop, which calls
+    /// `makeIterator()` behind the scenes, or when calling the iterator's
+    /// `next()` method directly.
+    ///
+    ///     let hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
+    ///     for (name, hueValue) in hues {
+    ///         print("The hue of \(name) is \(hueValue).")
+    ///     }
+    ///     // Prints "The hue of Heliotrope is 296."
+    ///     // Prints "The hue of Coral is 16."
+    ///     // Prints "The hue of Aquamarine is 156."
+    ///
+    /// - Returns:  An iterator over the hash table with elements of type
+    ///             `(key: Key, value: Value)`.
     public func makeIterator() -> AnyIterator<Element> {
         guard
             !isEmpty
@@ -525,6 +905,19 @@ extension SeparateChainingHashTable: Sequence {
 
 // MARK: - Collection conformance
 extension SeparateChainingHashTable: Collection {
+    final class ID {  }
+    
+    /// The position of a key-value pair in an hash table.
+    ///
+    /// Hash table has two subscripting interfaces:
+    ///
+    /// 1. Subscripting with a key, yielding an optional value:
+    ///
+    ///        v = d[k]!
+    ///
+    /// 2. Subscripting with an index, yielding a key-value pair:
+    ///
+    ///        (k, v) = d[i]
     public struct Index: Comparable {
         internal var id: ID
         
@@ -554,7 +947,13 @@ extension SeparateChainingHashTable: Collection {
             while currentTableIndex < (buffer?.capacity ?? 0) {
                 currentBag = self.buffer?.table[currentTableIndex]
                 while let e = currentBag {
-                    guard e.key != k else { return }
+                    guard
+                        e.key != k
+                    else {
+                        currentTableIndex += 1
+                        
+                        return
+                    }
                     
                     currentBag = e.next
                 }
@@ -637,6 +1036,55 @@ extension SeparateChainingHashTable: Collection {
         return nextIndex
     }
     
+    /// Returns the index for the given key.
+    ///
+    /// If the given key is found in the hash table, this method returns an index
+    /// into the dictionary that corresponds with the key-value pair.
+    ///
+    ///     let countryCodes: SeparateChainingHashTable<String, String> = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+    ///     let index = countryCodes.index(forKey: "JP")
+    ///
+    ///     print("Country code for \(countryCodes[index!].value): '\(countryCodes[index!].key)'.")
+    ///     // Prints "Country code for Japan: 'JP'."
+    ///
+    /// - Parameter key: The key to find in the hash table.
+    /// - Returns:  The index for `key` and its associated value if `key` is in
+    ///             the hash table; otherwise, `nil`.
+    public func index(forKey key: Key) -> Index? {
+        let idx = Index(asIndexOfKey: key, for: self)
+        
+        guard
+            idx < endIndex
+        else { return nil }
+        
+        return idx
+    }
+    
+    /// Accesses the key-value pair at the specified position.
+    ///
+    /// This subscript takes an index into the hash table, instead of a key, and
+    /// returns the corresponding key-value pair as a tuple. When performing
+    /// collection-based operations that return an index into an hash table, use
+    /// this subscript with the resulting value.
+    ///
+    /// For example, to find the key for a particular value in an hash table, use
+    /// the `firstIndex(where:)` method.
+    ///
+    ///     let countryCodes: SeparateChainingHashTable<String, String> = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
+    ///     if let index = countryCodes.firstIndex(where: { $0.value == "Japan" }) {
+    ///         print(countryCodes[index])
+    ///         print("Japan's country code is '\(countryCodes[index].key)'.")
+    ///     } else {
+    ///         print("Didn't find 'Japan' as a value in the dictionary.")
+    ///     }
+    ///     // Prints "("JP", "Japan")"
+    ///     // Prints "Japan's country code is 'JP'."
+    ///
+    /// - Parameter position:   The position of the key-value pair to access.
+    ///                         `position` must be a valid index of the hash table
+    ///                         and not equal to `endIndex`.
+    /// - Returns:  A two-element tuple with the key and value corresponding to
+    ///             `position`.
     public subscript(position: Index) -> (key: Key, value: Value) {
         get {
             precondition(position.isValidFor(self), "invalid index for this hash table")

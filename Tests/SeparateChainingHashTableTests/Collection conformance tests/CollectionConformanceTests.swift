@@ -139,4 +139,8 @@ final class CollectionConformanceTests: XCTestCase {
         XCTAssertEqual(i, sut.endIndex)
     }
     
+    func testIndexForKey() {
+        XCTFail("test not yet implemented")
+    }
+    
 }
