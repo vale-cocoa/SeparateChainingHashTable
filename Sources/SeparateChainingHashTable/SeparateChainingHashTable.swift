@@ -67,7 +67,7 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     @inline(__always)
     public var isEmpty: Bool { buffer?.isEmpty ?? true }
     
-    /// An array containing just the keys of the hash table.
+    /// A collection containing just the keys of the hash table.
     ///
     /// When iterated over, keys appear in this collection in the same order as
     /// they occur in the hash table's key-value pairs. Each key in the keys
@@ -86,9 +86,9 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     ///
     /// - Complexity: O(*n*) where *n* is lenght of this hash table.
     @inline(__always)
-    public var keys: [Key] { buffer?.map { $0.key } ?? [] }
+    public var keys: Keys { Keys(self) }
     
-    /// An array containing just the values of the hash table.
+    /// A collection containing just the values of the hash table.
     ///
     /// When iterated over, values appear in this collection in the same order as
     /// they occur in the hash table's key-value pairs.
@@ -106,7 +106,7 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     ///
     /// - Complexity: O(*n*) where *n* is lenght of this hash table.
     @inline(__always)
-    public var values: [Value] { buffer?.map { $0.value } ?? [] }
+    public var values: Values { Values(self) }
     
     @inline(__always)
     fileprivate var freeCapacity: Int { capacity - count }
@@ -868,6 +868,24 @@ extension SeparateChainingHashTable {
 
 // MARK: - Sequence conformance
 extension SeparateChainingHashTable: Sequence {
+    /// An iterator over the members of a `SeparateChainingHashTable<Key, Value>`.
+    public struct Iterator: IteratorProtocol {
+        private var bufferIterator: AnyIterator<Element>?
+        
+        fileprivate init(buffer: HashTableBuffer<Key, Value>?) {
+            self.bufferIterator = buffer?.makeIterator()
+        }
+        
+        public mutating func next() -> Element? {
+            guard bufferIterator != nil else { return nil }
+            
+            let nextElement = bufferIterator?.next()
+            if nextElement == nil { bufferIterator = nil }
+            
+            return nextElement
+        }
+    }
+    
     /// A value equal to the number of key-value pairs stored in the hash table.
     ///
     /// - Complexity: O(1).
@@ -890,15 +908,8 @@ extension SeparateChainingHashTable: Sequence {
     ///
     /// - Returns:  An iterator over the hash table with elements of type
     ///             `(key: Key, value: Value)`.
-    public func makeIterator() -> AnyIterator<Element> {
-        guard
-            !isEmpty
-        else {
-            
-            return AnyIterator { return nil }
-        }
-        
-        return buffer!.makeIterator()
+    public func makeIterator() -> Iterator {
+        Iterator(buffer: buffer)
     }
     
 }
@@ -1036,7 +1047,7 @@ extension SeparateChainingHashTable: Collection {
         return nextIndex
     }
     
-    func formIndex(_ i: inout Index, offsetBy distance: Int) {
+    public func formIndex(_ i: inout Index, offsetBy distance: Int) {
         precondition(distance >= 0 , "distance must not be negative")
         precondition(i.isValidFor(self), "invalid index for this hash table")
         let end = endIndex
@@ -1053,11 +1064,15 @@ extension SeparateChainingHashTable: Collection {
         
         return offSetted
     }
-    
-    func formIndex(_ i: inout Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Bool {
+ 
+    public func formIndex(_ i: inout Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Bool {
         precondition(distance >= 0 , "distance must not be negative")
         precondition(i.isValidFor(self), "invalid index for this hash table")
         precondition(limit.isValidFor(self), "invalid limit index for this hash table")
+        
+        guard
+            distance > 0
+        else { return i <= limit }
         
         let end = endIndex
         var offset = 0
@@ -1066,7 +1081,7 @@ extension SeparateChainingHashTable: Collection {
             offset += 1
         }
         
-        return distance == (offset - 1)
+        return distance == offset
     }
     
     public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
@@ -1198,6 +1213,141 @@ extension SeparateChainingHashTable: Codable where Key: Codable, Value: Codable 
         try self.init(keysAndValues, uniquingKeysWith: { _, _ in
             throw Error.duplicateKeys
         })
+    }
+    
+}
+
+// MARK: - Keys and Values
+extension SeparateChainingHashTable {
+    /// A view of an hash table's keys.
+    public struct Keys: Collection, Equatable {
+        private let ht: SeparateChainingHashTable
+        
+        fileprivate init(_ ht: SeparateChainingHashTable) {
+            self.ht = ht
+        }
+        
+        // Collection conformance
+        public typealias Element = SeparateChainingHashTable.Key
+        
+        public typealias Index = SeparateChainingHashTable.Index
+        
+        public var count: Int { ht.count }
+        
+        public var underestimatedCount: Int { ht.count }
+        
+        public var isEmpty: Bool { ht.isEmpty }
+        
+        public var startIndex: Index { ht.startIndex }
+        
+        public var endIndex: Index { ht.endIndex }
+        
+        public func formIndex(after i: inout Index) {
+            ht.formIndex(after: &i)
+        }
+        
+        public func index(after i: Index) -> Index {
+            ht.index(after: i)
+        }
+        
+        public func formIndex(_ i: inout Index, offsetBy distance: Int) {
+            ht.formIndex(&i, offsetBy: distance)
+        }
+        
+        public func index(_ i: Index, offsetBy distance: Int) -> Index {
+            ht.index(i, offsetBy: distance)
+        }
+        
+        public func formIndex(_ i: inout Index, offsetBy distance: Int, limitedBy limit: Index) -> Bool {
+            ht.formIndex(&i, offsetBy: distance, limitedBy: limit)
+        }
+        
+        public func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
+            ht.index(i, offsetBy: distance, limitedBy: limit)
+        }
+        
+        public subscript(position: Index) -> Element {
+            ht[position].key
+        }
+        
+        // Equatable
+        public static func == (lhs: Keys, rhs: Keys) -> Bool {
+            guard lhs.count == rhs.count else { return false }
+            for (lElement, rElement) in zip(lhs.ht, rhs.ht) where lElement.key != rElement.key { return false }
+            
+            return true
+        }
+        
+    }
+    
+    /// A view of an hash table's values.
+    public struct Values: MutableCollection {
+        private var ht: SeparateChainingHashTable
+        
+        fileprivate init(_ ht: SeparateChainingHashTable) {
+            self.ht = ht
+        }
+        
+        // Collection conformance
+        public typealias Element = SeparateChainingHashTable.Value
+        
+        public typealias Index = SeparateChainingHashTable.Index
+        
+        public var count: Int { ht.count }
+        
+        public var underestimatedCount: Int { ht.count }
+        
+        public var isEmpty: Bool { ht.isEmpty }
+        
+        public var startIndex: Index { ht.startIndex }
+        
+        public var endIndex: Index { ht.endIndex }
+        
+        public func formIndex(after i: inout Index) {
+            ht.formIndex(after: &i)
+        }
+        
+        public func index(after i: Index) -> Index {
+            ht.index(after: i)
+        }
+        
+        public func formIndex(_ i: inout Index, offsetBy distance: Int) {
+            ht.formIndex(&i, offsetBy: distance)
+        }
+        
+        public func index(_ i: Index, offsetBy distance: Int) -> Index {
+            ht.index(i, offsetBy: distance)
+        }
+        
+        public func formIndex(_ i: inout Index, offsetBy distance: Int, limitedBy limit: Index) -> Bool {
+            ht.formIndex(&i, offsetBy: distance, limitedBy: limit)
+        }
+        
+        public func index(_ i: Index, offsetBy distance: Int, limitedBy limit: Index) -> Index? {
+            ht.index(i, offsetBy: distance, limitedBy: limit)
+        }
+        
+        public subscript(position: Index) -> Element {
+            get { ht[position].value }
+            
+            mutating set {
+                precondition(position >= ht.startIndex && position < ht.endIndex, "index out of bounds")
+                ht[position.currentBag!.key] = newValue
+            }
+        }
+        
+    }
+    
+}
+
+// Equatable conformance for Values
+extension SeparateChainingHashTable.Values: Equatable where Value: Equatable {
+    public static func == (lhs: SeparateChainingHashTable.Values, rhs: SeparateChainingHashTable.Values) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        
+        for (lElement, rElement) in zip(lhs.ht, rhs.ht) where lElement.value != rElement.value { return false }
+        
+        return true
     }
     
 }

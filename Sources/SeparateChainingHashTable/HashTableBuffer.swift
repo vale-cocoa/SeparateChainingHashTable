@@ -323,7 +323,7 @@ extension HashTableBuffer: Sequence {
         var currentIdx: Int = 0
         var currentBagIterator: AnyIterator<Element>?
  
-        return AnyIterator { [unowned self] in
+        return AnyIterator { 
             guard
                 let nextElement = currentBagIterator?.next()
             else {

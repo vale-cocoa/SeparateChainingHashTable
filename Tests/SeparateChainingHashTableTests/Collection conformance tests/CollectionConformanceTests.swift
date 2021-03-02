@@ -128,20 +128,144 @@ final class CollectionConformanceTests: XCTestCase {
     
     // This test will also test internal method formIndex(_:offsetBy:)
     func testIndexOffsetBy() {
-        XCTFail("test not yet implemented")
+        // when is empty, then returns endIndex
+        XCTAssertTrue(sut.isEmpty)
+        var start = sut.startIndex
+        var end = sut.endIndex
+        for distance in 0..<100 {
+            XCTAssertEqual(sut.index(start, offsetBy: distance), end)
+        }
+        
+        // when is not empty
+        whenIsNotEmpty()
+        start = sut.startIndex
+        end = sut.endIndex
+        var i = start
+        let elements = sut!.map { $0 }
+        for offset in 0..<sut.count {
+            // adding distance would not go beyond than last element,
+            // then returns index in bounds
+            // pointing to correct element
+            var distance = 0
+            while (offset + distance) < sut.count {
+                let offsetted = sut.index(i, offsetBy: distance)
+                if offsetted >= start && offsetted < end {
+                    let elementAtDistance = elements[distance + offset]
+                    let elementAtIndex = sut[offsetted]
+                    XCTAssertEqual(elementAtIndex.key, elementAtDistance.key)
+                    XCTAssertEqual(elementAtIndex.value, elementAtDistance.value)
+                } else {
+                    XCTFail("returned an index out bounds")
+                }
+                
+                distance += 1
+            }
+            
+            // otherwise when adding distance would go beyond
+            // last element, then returns endIndex
+            for distance in sut.count - offset..<(sut.count - offset + Int.random(in: 0...10)) {
+                XCTAssertGreaterThanOrEqual(distance + offset, sut.count)
+                let offsetted = sut.index(i, offsetBy: distance)
+                XCTAssertEqual(offsetted, end)
+            }
+            
+            sut.formIndex(after: &i)
+        }
     }
     
     func testFormIndexOffsetByLimitedBy() {
-        XCTFail("test not yet implemented")
+        // when is empty and distance is 0,
+        // then returns true and i is endIndex
+        XCTAssertTrue(sut.isEmpty)
+        var i = sut.startIndex
+        var end = sut.endIndex
+        XCTAssertTrue(sut.formIndex(&i, offsetBy: 0, limitedBy: end))
+        XCTAssertEqual(i, end)
+        
+        // when is empty and distance is greater than 0,
+        // then returns false and i is endIndex
+        for distance in 1..<10 {
+            i = sut.startIndex
+            end = sut.endIndex
+            XCTAssertFalse(sut.formIndex(&i, offsetBy: distance, limitedBy: end))
+            XCTAssertEqual(i, end)
+        }
+        
+        // when is not empty
+        whenIsNotEmpty()
+        i = sut.startIndex
+        end = sut.endIndex
+        for offset in 0..<sut.count {
+            var distance = 0
+            while distance <= (sut.count - offset) {
+                // and when offsetting doesn't go beyond limit,
+                // then returns true and formed index is
+                // equal to index offsetted by distance amount
+                var j = i
+                var expectedIndex = j
+                sut.formIndex(&expectedIndex, offsetBy: distance)
+                XCTAssertTrue(sut.formIndex(&j, offsetBy: distance, limitedBy: end))
+                XCTAssertEqual(j, expectedIndex)
+                
+                distance += 1
+                
+                // otherwise when offsetting goes beyond limit, then
+                // returns false and formed index is equal to limit:
+                j = i
+                var limit = j
+                sut.formIndex(&limit, offsetBy: distance - 1)
+                XCTAssertFalse(sut.formIndex(&j, offsetBy: distance, limitedBy: limit))
+                XCTAssertEqual(j, limit)
+            }
+            
+            sut.formIndex(after: &i)
+        }
     }
     
     func testIndexOffsetByLimitedBy() {
-        XCTFail("test not yet implemented")
+        // when is empty and distance is 0, then returns endIndex
+        XCTAssertTrue(sut.isEmpty)
+        var i = sut.startIndex
+        var end = sut.endIndex
+        XCTAssertEqual(sut.index(i, offsetBy: 0, limitedBy: end), end)
+        
+        // when is empty and distance is grater than 0,
+        // then returns nil
+        for distance in 1..<10 {
+            XCTAssertNil(sut.index(i, offsetBy: distance, limitedBy: end))
+        }
+        
+        // when is not empty
+        whenIsNotEmpty()
+        i = sut.startIndex
+        end = sut.endIndex
+        for offset in 0..<sut.count {
+            var distance = 0
+            while distance <= (sut.count - offset) {
+                // and when offsetting doesn't go beyond limit, then
+                // returns index offsetted
+                var limit = i
+                sut.formIndex(&limit, offsetBy: distance)
+                for d in 0...distance {
+                    var expectedResult = i
+                    sut.formIndex(&expectedResult, offsetBy: d)
+                    XCTAssertEqual(sut.index(i, offsetBy: d, limitedBy: limit), expectedResult)
+                }
+                // otherwise when offsetting goes beyond limit,
+                // then returns nil
+                for d in (distance + 1)...(distance + 10) {
+                    XCTAssertNil(sut.index(i, offsetBy: d, limitedBy: limit))
+                }
+                distance += 1
+            }
+            sut.formIndex(after: &i)
+        }
+        
     }
     
     func testSubscriptPosition() {
         whenIsNotEmpty()
-        let sutIter = sut.makeIterator()
+        var sutIter = sut.makeIterator()
         var i = sut.startIndex
         while let expectedResult = sutIter.next() {
             let result = sut[i]

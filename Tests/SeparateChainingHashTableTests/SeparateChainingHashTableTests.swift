@@ -986,11 +986,11 @@ final class SeparateChainingHashTableTests: XCTestCase {
     
     func testMakeIterator() {
         XCTAssertNil(sut.buffer)
-        var iter = sut.makeIterator()
-        XCTAssertNil(iter.next())
+        var emptyIter = sut.makeIterator()
+        XCTAssertNil(emptyIter.next())
         
         whenIsNotEmpty()
-        iter = sut.makeIterator()
+        var iter = sut.makeIterator()
         let buffIter = sut.buffer!.makeIterator()
         while let sElement = iter.next() {
             let bElement = buffIter.next()
@@ -1056,6 +1056,15 @@ final class SeparateChainingHashTableTests: XCTestCase {
         lHasher.combine(lhs)
         rHasher.combine(rhs)
         XCTAssertNotEqual(lHasher.finalize(), rHasher.finalize())
+    }
+    
+    // MARK: - keys and values tests
+    func testKeys() {
+        XCTFail("test not yet implemented")
+    }
+    
+    func testValues() {
+        XCTFail("test not yet implemented")
     }
 }
 
