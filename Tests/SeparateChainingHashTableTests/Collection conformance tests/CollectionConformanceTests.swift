@@ -126,6 +126,19 @@ final class CollectionConformanceTests: XCTestCase {
         XCTAssertEqual(sut.index(after: sut.endIndex), sut.endIndex)
     }
     
+    // This test will also test internal method formIndex(_:offsetBy:)
+    func testIndexOffsetBy() {
+        XCTFail("test not yet implemented")
+    }
+    
+    func testFormIndexOffsetByLimitedBy() {
+        XCTFail("test not yet implemented")
+    }
+    
+    func testIndexOffsetByLimitedBy() {
+        XCTFail("test not yet implemented")
+    }
+    
     func testSubscriptPosition() {
         whenIsNotEmpty()
         let sutIter = sut.makeIterator()

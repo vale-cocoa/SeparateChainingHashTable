@@ -1036,6 +1036,45 @@ extension SeparateChainingHashTable: Collection {
         return nextIndex
     }
     
+    func formIndex(_ i: inout Index, offsetBy distance: Int) {
+        precondition(distance >= 0 , "distance must not be negative")
+        precondition(i.isValidFor(self), "invalid index for this hash table")
+        let end = endIndex
+        var offset = 0
+        while offset < distance && i < end {
+            i.moveToNextElement()
+            offset += 1
+        }
+    }
+    
+    public func index(_ i: Index, offsetBy distance: Int) -> Index {
+        var offSetted = i
+        formIndex(&offSetted, offsetBy: distance)
+        
+        return offSetted
+    }
+    
+    func formIndex(_ i: inout Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Bool {
+        precondition(distance >= 0 , "distance must not be negative")
+        precondition(i.isValidFor(self), "invalid index for this hash table")
+        precondition(limit.isValidFor(self), "invalid limit index for this hash table")
+        
+        let end = endIndex
+        var offset = 0
+        while offset < distance && i < end && i < limit {
+            i.moveToNextElement()
+            offset += 1
+        }
+        
+        return distance == (offset - 1)
+    }
+    
+    public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
+        var offsetted = i
+        let formed = formIndex(&offsetted, offsetBy: distance, limitedBy: limit)
+        return  formed == true ? offsetted : nil
+    }
+    
     /// Returns the index for the given key.
     ///
     /// If the given key is found in the hash table, this method returns an index
