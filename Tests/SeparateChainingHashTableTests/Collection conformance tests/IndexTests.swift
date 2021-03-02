@@ -159,7 +159,7 @@ final class IndexTests: XCTestCase {
         XCTAssertNil(sut.currentBag)
     }
     
-    func testInitAsIndefForKeyOf_whenKeyIsInHashTable_thenReturnsIndexPointingToTheHashTableElementForKey() {
+    func testInitAsIndexForKeyOf_whenKeyIsInHashTable_thenReturnsIndexPointingToTheHashTableElementForKey() {
         let ht = givenNotEmptyHashTable()
         for (key, value) in ht {
             sut = _Index(asIndexOfKey: key, for: ht)
@@ -167,6 +167,19 @@ final class IndexTests: XCTestCase {
             XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
             XCTAssertEqual(sut.currentBag?.key, key)
             XCTAssertEqual(sut.currentBag?.value, value)
+        }
+    }
+    
+    func testInitAsIndexForKeyOf_whenReturnsIndexPointingToHashTableElementForKey_thenIndexIsCorrectlyPositioned() {
+        let ht = givenEmptyHashTable()
+        let end = _Index(asEndIndexOf: ht)
+        for k in ht.keys {
+            sut = _Index(asIndexOfKey: k, for: ht)
+            var correctlyPositionedIndex = _Index(asStartIndexOf: ht)
+            while correctlyPositionedIndex.currentBag?.key != k && correctlyPositionedIndex < end {
+                correctlyPositionedIndex.moveToNextElement()
+            }
+            XCTAssertEqual(sut.currentTableIndex, correctlyPositionedIndex.currentTableIndex)
         }
     }
     

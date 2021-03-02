@@ -140,7 +140,27 @@ final class CollectionConformanceTests: XCTestCase {
     }
     
     func testIndexForKey() {
-        XCTFail("test not yet implemented")
+        // when is empty, then always returns nil
+        for _ in 0..<10 {
+            XCTAssertNil(sut.index(forKey: notContainedKey))
+        }
+        
+        // when is not empty and key is contained,
+        // then returns correct index for key
+        whenIsNotEmpty()
+        for k in containedKeys {
+            let idx = sut.index(forKey: k)
+            XCTAssertNotNil(idx)
+            if let idx = idx {
+                let element = sut[idx]
+                XCTAssertEqual(element.key, k)
+                XCTAssertEqual(element.value, sut[k])
+            }
+        }
+        // otherwise when key is not contained, then returns nil
+        for _ in 0..<10 {
+            XCTAssertNil(sut[notContainedKey])
+        }
     }
     
 }

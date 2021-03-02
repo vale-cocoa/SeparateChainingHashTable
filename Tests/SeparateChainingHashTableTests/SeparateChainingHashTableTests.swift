@@ -467,7 +467,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
     
     func testSubscriptKeyDefaultValue_getter() {
         // when is empty, then always returns defaultValue:
-        let defaultValue = Int.random(in: 100...1000)
+        let defaultValue = Int.random(in: 1000...10_000)
         for _ in 0..<10 {
             sut = HashTable()
             XCTAssertEqual(sut[notContainedKey, default: defaultValue], defaultValue)
@@ -487,8 +487,8 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testSubscriptKeyDefaultValue_setter() {
         // when is empty, then adds new element with key and newValue
         XCTAssertTrue(sut.isEmpty)
-        let defaultValue = Int.random(in: 600...1000)
-        let newValue = 10_000
+        let defaultValue = Int.random(in: 1000...10_000)
+        let newValue = 100_000
         let k = notContainedKey
         sut[k, default: defaultValue] = newValue
         XCTAssertEqual(sut.count, 1)
@@ -517,7 +517,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
     }
     
     func testSubscriptKeyDefaultValue_getterThenSetter() {
-        let defaultValue = Int.random(in: 600...1000)
+        let defaultValue = Int.random(in: 1000...10_000)
         // when is empty, then uses default value
         for _ in 0..<10 {
             sut = HashTable()
@@ -542,7 +542,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
     }
     
     func testSubscriptKeyDefaultValue_setter_copyOnWrite() {
-        let defaultValue = Int.random(in: 600...1000)
+        let defaultValue = Int.random(in: 1000...10_000)
         let newValue = randomValue()
         let k = notContainedKey
         // when buffer is nil
