@@ -32,6 +32,8 @@ import Foundation
 /// `SeparateChainingHashTable` shares the same functionalities
 /// of Swift `Dictionary`, except for invalidating its `Indicies` every time
 /// a call to a mutating method was done —no matter if a mutation has really took effect or not.
+/// - ToDo: Add `CustomStringConvertible` and
+///         `CustomDebugStringConvertible` conformances.
 public struct SeparateChainingHashTable<Key: Hashable, Value> {
     /// The element type of an hash table: a tuple containing an individual
     /// key-value pair.
@@ -106,7 +108,18 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     ///
     /// - Complexity: O(*n*) where *n* is lenght of this hash table.
     @inline(__always)
-    public var values: Values { Values(self) }
+    public var values: Values {
+        get { Values(self) }
+        
+        _modify {
+            var values = Values(Self())
+            swap(&values.ht, &self)
+            defer {
+                self = values.ht
+            }
+            yield &values
+        }
+    }
     
     @inline(__always)
     fileprivate var freeCapacity: Int { capacity - count }
@@ -993,12 +1006,14 @@ extension SeparateChainingHashTable: Collection {
             }
         }
         
+        @inline(__always)
         internal func isValidFor(_ ht: SeparateChainingHashTable) -> Bool {
-            id === ht.id && buffer === ht.buffer
+            id === ht.id
         }
         
+        @inline(__always)
         internal static func areValid(lhs: Index, rhs: Index) -> Bool {
-            lhs.id === rhs.id && lhs.buffer === rhs.buffer
+            lhs.id === rhs.id
         }
         
         public static func == (lhs: Index, rhs: Index) -> Bool {
@@ -1221,7 +1236,7 @@ extension SeparateChainingHashTable: Codable where Key: Codable, Value: Codable 
 extension SeparateChainingHashTable {
     /// A view of an hash table's keys.
     public struct Keys: Collection, Equatable {
-        private let ht: SeparateChainingHashTable
+        fileprivate let ht: SeparateChainingHashTable
         
         fileprivate init(_ ht: SeparateChainingHashTable) {
             self.ht = ht
@@ -1282,7 +1297,7 @@ extension SeparateChainingHashTable {
     
     /// A view of an hash table's values.
     public struct Values: MutableCollection {
-        private var ht: SeparateChainingHashTable
+        fileprivate var ht: SeparateChainingHashTable
         
         fileprivate init(_ ht: SeparateChainingHashTable) {
             self.ht = ht
@@ -1328,14 +1343,24 @@ extension SeparateChainingHashTable {
         }
         
         public subscript(position: Index) -> Element {
-            get { ht[position].value }
+            get {
+                ht[position].value
+            }
             
             mutating set {
                 precondition(position >= ht.startIndex && position < ht.endIndex, "index out of bounds")
-                ht[position.currentBag!.key] = newValue
+                makeUnique()
+                let k = position.currentBag!.key
+                ht.buffer!.setValue(newValue, forKey: k)
             }
         }
         
+        private mutating func makeUnique() {
+            if !isKnownUniquelyReferenced(&ht.buffer) {
+                let bufferCopy = ht.buffer?.copy() as? HashTableBuffer<Key, Value>
+                ht.buffer = bufferCopy
+            }
+        }
     }
     
 }

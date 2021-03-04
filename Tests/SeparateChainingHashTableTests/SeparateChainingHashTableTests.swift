@@ -1060,11 +1060,74 @@ final class SeparateChainingHashTableTests: XCTestCase {
     
     // MARK: - keys and values tests
     func testKeys() {
-        XCTFail("test not yet implemented")
+        // when is empty, then keys is empty too
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertTrue(sut.keys.isEmpty)
+        
+        // when is not empty, then keys is not empty and contains
+        // all keys in same order
+        whenIsNotEmpty()
+        XCTAssertFalse(sut.keys.isEmpty)
+        XCTAssertTrue(sut.keys.indices.elementsEqual(sut.indices, by: { sut.keys[$0] == sut[$1].key }), "keys doesn't contains same keys in the same order")
     }
     
-    func testValues() {
-        XCTFail("test not yet implemented")
+    func testKeys_copyOnWrite() {
+        // when storing keys and then changing hash table keys,
+        // then stored keys is different
+        whenIsNotEmpty()
+        let storedKeys = sut.keys
+        sut[notContainedKey] = randomValue()
+        XCTAssertNotEqual(storedKeys, sut.keys)
     }
+    
+    func testValues_getter() {
+        // when is empty, then values is empty too
+        XCTAssertTrue(sut.isEmpty)
+        XCTAssertTrue(sut.values.isEmpty)
+        
+        // when is not empty, then values is not empty and contains
+        // all values in same order
+        whenIsNotEmpty()
+        XCTAssertFalse(sut.values.isEmpty)
+        XCTAssertTrue(sut.values.indices.elementsEqual(sut.indices, by: { sut.values[$0] == sut[$1].value }))
+    }
+    
+    func testValues_setter() {
+        whenIsNotEmpty()
+        let expectedResult = sut!.values.map { $0 + 10 }
+        for idx in sut.values.indices {
+            sut.values[idx] += 10
+        }
+        
+        XCTAssertTrue(sut.values.elementsEqual(expectedResult))
+    }
+    
+    func testValues_getter_copyOnWrite() {
+        // when storing values and then changing hash table values,
+        // then stored values is different
+        whenIsNotEmpty()
+        var storedValues = sut.values
+        for k in sut.keys {
+            sut[k]! += 10
+        }
+        XCTAssertNotEqual(storedValues, sut.values)
+        
+        // when storing values and then changing it, then hash table
+        // is not affected:
+        storedValues = sut.values
+        storedValues[storedValues.startIndex] += 10
+        XCTAssertNotEqual(storedValues, sut.values)
+    }
+    
+    func testValues_setter_copyOnWrite() {
+        whenIsNotEmpty()
+        let clone = sut
+        for idx in sut.values.indices {
+            sut.values[idx] += 10
+        }
+        
+        XCTAssertFalse(sut.buffer === clone?.buffer)
+    }
+    
 }
 
