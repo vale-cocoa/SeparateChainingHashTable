@@ -321,7 +321,7 @@ extension SeparateChainingHashTable {
     ///
     /// This *key-based* subscript returns the value for the given key if the key
     /// is found in the hash table, or `nil` if the key is not found.
-    /// The setter of this subscript invalidates all indices of the hash table.
+    /// The setter of this subscript might invalidate all indices of the hash table.
     ///
     /// The following example creates a new hash table and prints the value of a
     /// key found in the has table (`"Coral"`) and a key not found in the
@@ -382,7 +382,7 @@ extension SeparateChainingHashTable {
     ///
     /// Use this subscript when you want either the value for a particular key
     /// or, when that key is not present in the hash table, a default value.
-    /// The setter of this subscript invalidates all indices of the hash table.
+    /// The setter of this subscript might invalidate all indices of the hash table.
     /// This example uses the subscript with a message to use in case an HTTP response
     /// code isn't recognized:
     ///
@@ -435,8 +435,7 @@ extension SeparateChainingHashTable {
         }
         
         mutating set {
-            makeUniqueEventuallyIncreasingCapacity()
-            buffer!.setValue(newValue, forKey: key)
+            updateValue(newValue, forKey: key)
         }
     }
     
@@ -456,7 +455,7 @@ extension SeparateChainingHashTable {
     /// Use this method instead of key-based subscripting when you need to know
     /// whether the new value supplants the value of an existing key. If the
     /// value of an existing key is updated, `updateValue(_:forKey:)` returns
-    /// the original value. This method invalidates all indices of the hash table.
+    /// the original value. This method might invalidate all indices of the hash table.
     ///
     ///     var hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
     ///
@@ -559,7 +558,7 @@ extension SeparateChainingHashTable {
     /// method to avoid multiple reallocations. This method ensures that the
     /// hash table has unique, mutable, contiguous storage, with space allocated
     /// for at least the requested number of key-value pairs.
-    /// This method invalidates all indices of the hash table.
+    /// This method might invalidate all indices of the hash table.
     ///
     /// - Parameter minimumCapacity:    The requested number of
     ///                                 key-value pairs to store.
@@ -601,6 +600,7 @@ extension SeparateChainingHashTable {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             try merge(other, uniquingKeysWith: combine)
         } else {
+            id = ID()
             makeUnique()
             try buffer!.merge(keysAndValues, uniquingKeysWith: combine)
         }
@@ -615,7 +615,7 @@ extension SeparateChainingHashTable {
     /// is called with the current and new values for any duplicate keys that
     /// are encountered.
     ///
-    /// This method invalidates all indices of the hash table.
+    /// This method might invalidate all indices of the hash table.
     /// This example shows how to choose the current or new values for any
     /// duplicate keys:
     ///
@@ -637,9 +637,10 @@ extension SeparateChainingHashTable {
     ///                 duplicate keys. The closure returns the desired value
     ///                 for the final hash table.
     public mutating func merge(_ other: SeparateChainingHashTable, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
-        makeUnique()
         guard !other.isEmpty else { return }
         
+        makeUnique()
+        id = ID()
         try! buffer!.merge(other.buffer!, uniquingKeysWith: combine)
     }
     
@@ -806,8 +807,10 @@ extension SeparateChainingHashTable {
     @discardableResult
     public mutating func remove(at index: Index) -> Element {
         precondition(index.isValidFor(self), "invalid index for this hash table")
-        precondition(index.currentBag != nil, "index out of bounds")
-        let removedElement = index.currentBag!.element
+        guard
+            let removedElement = index.currentBag(on: buffer)?.element else {
+            preconditionFailure("index out of bounds")
+        }
         makeUniqueEventuallyReducingCapacity()
         defer { removeValue(forKey: removedElement.key) }
         
@@ -832,10 +835,10 @@ extension SeparateChainingHashTable {
     }
     
     mutating func makeUniqueEventuallyReducingCapacity() {
+        id = ID()
         guard
             !isEmpty
         else {
-            id = ID()
             buffer = nil
             
             return
@@ -849,8 +852,6 @@ extension SeparateChainingHashTable {
             return
         }
         
- 
-        id = ID()
         let mCapacity = Swift.max(capacity / 2, Self.minBufferCapacity)
         buffer = buffer!.clone(newCapacity: mCapacity)
     }
@@ -871,9 +872,15 @@ extension SeparateChainingHashTable {
     }
     
     mutating func makeUnique() {
-        id = ID()
-        if !isKnownUniquelyReferenced(&buffer) {
-            buffer = buffer?.copy() as? HashTableBuffer<Key, Value> ?? HashTableBuffer(minimumCapacity: Self.minBufferCapacity)
+        guard buffer != nil else {
+            id = ID()
+            buffer = HashTableBuffer(minimumCapacity: Self.minBufferCapacity)
+            
+            return
+        }
+        
+        if !isKnownUniquelyReferenced(&buffer!) {
+            buffer = (buffer!.copy() as! HashTableBuffer<Key, Value>)
         }
     }
     
@@ -947,68 +954,115 @@ extension SeparateChainingHashTable: Collection {
         
         internal var currentTableIndex: Int
         
-        internal unowned(unsafe) var currentBag: HashTableBuffer<Key, Value>.Bag?
-        
-        internal unowned(unsafe) var buffer: HashTableBuffer<Key, Value>?
+        internal var currentBagOffset: Int = 0
         
         internal init(asStartIndexOf ht: SeparateChainingHashTable) {
             self.id = ht.id
             self.currentTableIndex = 0
-            self.buffer = ht.buffer
-            moveToNextElement()
-        }
-        
-        internal init(asEndIndexOf ht: SeparateChainingHashTable) {
-            self.id = ht.id
-            self.buffer = ht.buffer
-            self.currentTableIndex = ht.capacity
-        }
-        
-        internal init(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
-            self.id = ht.id
-            self.buffer = ht.buffer
-            self.currentTableIndex = 0
-            while currentTableIndex < (buffer?.capacity ?? 0) {
-                currentBag = self.buffer?.table[currentTableIndex]
-                while let e = currentBag {
-                    guard
-                        e.key != k
-                    else {
-                        currentTableIndex += 1
-                        
-                        return
-                    }
-                    
-                    currentBag = e.next
-                }
-                
-                currentTableIndex += 1
-            }
-        }
-        
-        internal mutating func moveToNextElement() {
             guard
-                buffer != nil
-            else { return }
+                !ht.isEmpty
+            else {
+                currentTableIndex = ht.capacity
+                
+                return
+            }
             
-            currentBag = currentBag?.next
-            
-            if currentBag == nil {
-                while currentTableIndex < buffer!.capacity {
-                    if let bag = buffer!.table[currentTableIndex] {
-                        currentBag = bag
-                        currentTableIndex += 1
-                        
-                        break
-                    }
+            while currentTableIndex < ht.capacity {
+                if ht.buffer!.table[currentTableIndex] != nil {
+                    
+                    return
+                } else {
                     currentTableIndex += 1
                 }
             }
         }
         
+        internal init(asEndIndexOf ht: SeparateChainingHashTable) {
+            self.id = ht.id
+            self.currentTableIndex = ht.capacity
+        }
+        
+        internal init(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
+            self.id = ht.id
+            guard !ht.isEmpty else {
+                self.currentTableIndex = ht.capacity
+                
+                return
+            }
+            
+            self.currentTableIndex = ht.buffer!.hashIndex(forKey: k)
+            
+            guard
+                var currentBag = ht.buffer!.table[currentTableIndex]
+            else {
+                self.currentTableIndex = ht.capacity
+                
+                return
+            }
+            
+            guard
+                currentBag.key != k
+            else { return }
+            
+            while let n = currentBag.next {
+                self.currentBagOffset += 1
+                if n.key == k { return }
+                
+                currentBag = n
+            }
+            currentTableIndex = ht.capacity
+            currentBagOffset = 0
+        }
+        
+        @discardableResult
+        internal func currentBag(on buffer: HashTableBuffer<Key, Value>?) -> HashTableBuffer<Key, Value>.Bag? {
+            guard
+                currentTableIndex < (buffer?.capacity ?? 0)
+            else { return nil }
+            
+            guard
+                var bag = buffer?.table[currentTableIndex]
+            else { return nil }
+            
+            if currentBagOffset == 0 { return bag }
+            precondition(currentBagOffset < bag.count, "Malformed index")
+            for _ in 0..<currentBagOffset {
+                bag = bag.next!
+            }
+            
+            return bag
+        }
+        
+        @discardableResult
+        internal mutating func moveToNextElement(on buffer: HashTableBuffer<Key, Value>?) -> HashTableBuffer<Key, Value>.Bag? {
+            guard
+                let thisBag = currentBag(on: buffer)
+            else { return nil }
+            
+            if let nextBag = thisBag.next {
+                currentBagOffset += 1
+                
+                return nextBag
+            }
+            
+            currentTableIndex += 1
+            currentBagOffset = 0
+            while currentTableIndex < buffer!.capacity {
+                if let nextBag = buffer!.table[currentTableIndex] {
+                    
+                    return nextBag
+                }
+                
+                currentTableIndex += 1
+            }
+            
+            return nil
+        }
+        
         @inline(__always)
         internal func isValidFor(_ ht: SeparateChainingHashTable) -> Bool {
-            id === ht.id
+            id === ht.id && currentTableIndex <= ht.capacity
+            
         }
         
         @inline(__always)
@@ -1019,7 +1073,7 @@ extension SeparateChainingHashTable: Collection {
         public static func == (lhs: Index, rhs: Index) -> Bool {
             precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
             
-            return lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBag === rhs.currentBag
+            return lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBagOffset == rhs.currentBagOffset
         }
         
         // MARK: - Index Comparable conformance
@@ -1028,14 +1082,8 @@ extension SeparateChainingHashTable: Collection {
             guard
                 lhs.currentTableIndex != rhs.currentTableIndex
             else {
-                switch (lhs.currentBag, rhs.currentBag) {
-                case (nil, nil): return false
-                case (.some(_ ), nil): return true
-                case (nil, .some(_ )): return false
-                case (.some(let lB), .some(let rB)):
-                    if lB === rB { return false }
-                    return rB.count < lB.count
-                }
+                
+                return lhs.currentBagOffset < rhs.currentBagOffset
             }
             
             return lhs.currentTableIndex < rhs.currentTableIndex
@@ -1050,14 +1098,14 @@ extension SeparateChainingHashTable: Collection {
     public func formIndex(after i: inout Index) {
         precondition(i.isValidFor(self), "invalid index for this hash table")
         
-        i.moveToNextElement()
+        i.moveToNextElement(on: self.buffer)
     }
     
     public func index(after i: Index) -> Index {
         precondition(i.isValidFor(self), "invalid index for this hash table")
         
         var nextIndex = i
-        nextIndex.moveToNextElement()
+        nextIndex.moveToNextElement(on: self.buffer)
         
         return nextIndex
     }
@@ -1068,7 +1116,7 @@ extension SeparateChainingHashTable: Collection {
         let end = endIndex
         var offset = 0
         while offset < distance && i < end {
-            i.moveToNextElement()
+            i.moveToNextElement(on: self.buffer)
             offset += 1
         }
     }
@@ -1092,7 +1140,7 @@ extension SeparateChainingHashTable: Collection {
         let end = endIndex
         var offset = 0
         while offset < distance && i < end && i < limit {
-            i.moveToNextElement()
+            i.moveToNextElement(on: self.buffer)
             offset += 1
         }
         
@@ -1157,9 +1205,13 @@ extension SeparateChainingHashTable: Collection {
     public subscript(position: Index) -> (key: Key, value: Value) {
         get {
             precondition(position.isValidFor(self), "invalid index for this hash table")
-            precondition(position.currentBag != nil, "index out of bounds")
+            guard
+                let element = position.currentBag(on: self.buffer)?.element
+            else {
+                preconditionFailure("index out of bounds")
+            }
            
-            return position.currentBag!.element
+            return element
         }
     }
     
@@ -1348,17 +1400,12 @@ extension SeparateChainingHashTable {
             }
             
             mutating set {
-                precondition(position >= ht.startIndex && position < ht.endIndex, "index out of bounds")
-                makeUnique()
-                let k = position.currentBag!.key
-                ht.buffer!.setValue(newValue, forKey: k)
-            }
-        }
-        
-        private mutating func makeUnique() {
-            if !isKnownUniquelyReferenced(&ht.buffer) {
-                let bufferCopy = ht.buffer?.copy() as? HashTableBuffer<Key, Value>
-                ht.buffer = bufferCopy
+                ht.makeUnique()
+                guard
+                    let b = position.currentBag(on: ht.buffer)
+                else { preconditionFailure("index out of bounds") }
+                
+                b.value = newValue
             }
         }
     }

@@ -62,7 +62,8 @@ final class IndexTests: XCTestCase {
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         XCTAssertNil(ht.buffer)
         
         // when hash table is empty and its buffer is not nil
@@ -70,26 +71,27 @@ final class IndexTests: XCTestCase {
         sut = _Index(asStartIndexOf: ht)
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         
         // when hash table is not empty
         ht = givenNotEmptyHashTable()
         var expectedCurrentTableIndex = 0
         var expectedCurrentBag: HashTableBuffer<String, Int>.Bag? = nil
-        while expectedCurrentTableIndex < ht.buffer!.capacity && expectedCurrentBag == nil {
+        while expectedCurrentTableIndex < ht.buffer!.capacity {
             expectedCurrentBag = ht.buffer?.table[expectedCurrentTableIndex]
+            guard expectedCurrentBag == nil else { break }
+            
             expectedCurrentTableIndex += 1
         }
         
         sut = _Index(asStartIndexOf: ht)
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, expectedCurrentTableIndex)
-        XCTAssertNotNil(sut.currentBag)
-        XCTAssertTrue(sut.currentBag === expectedCurrentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNotNil(sut.currentBag(on: ht.buffer))
     }
     
     func testInitAsEndIndexOf() {
@@ -100,8 +102,8 @@ final class IndexTests: XCTestCase {
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
-        XCTAssertNil(ht.buffer)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        XCTAssertEqual(sut.currentBagOffset, 0)
         
         // when hash table is empty and its buffer is not nil
         ht = givenEmptyHashTable(bufferCapacity: Int.random(in: 1...10))
@@ -109,9 +111,9 @@ final class IndexTests: XCTestCase {
         sut = _Index(asEndIndexOf: ht)
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         
         // when hash table is not empty
         ht = givenNotEmptyHashTable()
@@ -119,9 +121,9 @@ final class IndexTests: XCTestCase {
         sut = _Index(asEndIndexOf: ht)
         XCTAssertNotNil(sut)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
     }
     
     func testInitAsIndexForKeyOf_whenKeyIsNotInHashTable_thenReturnsHashTablesEndIndex() {
@@ -130,17 +132,17 @@ final class IndexTests: XCTestCase {
         
         sut = _Index(asIndexOfKey: randomKey(), for: ht)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertNil(sut.buffer)
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         
         // when hash table is empty and its buffer is not nil
         ht = givenEmptyHashTable(bufferCapacity: Int.random(in: 1...10))
         sut = _Index(asIndexOfKey: randomKey(), for: ht)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         
         // when hash table is not empty
         ht = givenNotEmptyHashTable()
@@ -154,9 +156,9 @@ final class IndexTests: XCTestCase {
         
         sut = _Index(asIndexOfKey: notContainedKey, for: ht)
         XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertNil(sut.currentBag)
+        XCTAssertEqual(sut.currentBagOffset, 0)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
     }
     
     func testInitAsIndexForKeyOf_whenKeyIsInHashTable_thenReturnsIndexPointingToTheHashTableElementForKey() {
@@ -164,9 +166,8 @@ final class IndexTests: XCTestCase {
         for (key, value) in ht {
             sut = _Index(asIndexOfKey: key, for: ht)
             XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-            XCTAssertTrue(sut.buffer === ht.buffer, "wrong buffer reference")
-            XCTAssertEqual(sut.currentBag?.key, key)
-            XCTAssertEqual(sut.currentBag?.value, value)
+            XCTAssertEqual(sut.currentBag(on: ht.buffer)?.key, key)
+            XCTAssertEqual(sut.currentBag(on: ht.buffer)?.value, value)
         }
     }
     
@@ -176,50 +177,80 @@ final class IndexTests: XCTestCase {
         for k in ht.keys {
             sut = _Index(asIndexOfKey: k, for: ht)
             var correctlyPositionedIndex = _Index(asStartIndexOf: ht)
-            while correctlyPositionedIndex.currentBag?.key != k && correctlyPositionedIndex < end {
-                correctlyPositionedIndex.moveToNextElement()
+            while correctlyPositionedIndex.currentBag(on: ht.buffer)?.key != k && correctlyPositionedIndex < end {
+                correctlyPositionedIndex.moveToNextElement(on: ht.buffer)
             }
             XCTAssertEqual(sut.currentTableIndex, correctlyPositionedIndex.currentTableIndex)
         }
     }
     
+    func testCurrentBagOf() {
+        // when buffer is nil
+        var ht = givenEmptyHashTable()
+        sut = _Index(asStartIndexOf: ht)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        
+        // when buffer is not nil and is empty
+        ht = givenEmptyHashTable(bufferCapacity: Int.random(in: 1...10))
+        sut = _Index(asStartIndexOf: ht)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        
+        // when buffer is not empty
+        ht = givenNotEmptyHashTable()
+        sut = _Index(asStartIndexOf: ht)
+        for (key, value) in ht {
+            let currentBag = sut.currentBag(on: ht.buffer)
+            XCTAssertEqual(currentBag?.key, key)
+            XCTAssertEqual(currentBag?.value, value)
+            // make index point to next element
+            if currentBag?.next != nil {
+                sut.currentBagOffset += 1
+            } else {
+                sut.currentBagOffset = 0
+                sut.currentTableIndex += 1
+                Lookup: while sut.currentTableIndex < ht.capacity {
+                    if ht.buffer?.table[sut.currentTableIndex] != nil {
+                        break Lookup
+                    }
+                    sut.currentTableIndex += 1
+                }
+            }
+        }
+    }
+    
     func testMoveToNextElement_whenBufferIsNil_thenNothingHappens() {
-        XCTAssertNil(sut.buffer)
         let prevId = sut.id
         let prevCurrentTableIndex = sut.currentTableIndex
-        let prevCurrentBag = sut.currentBag
+        let prevCurrentBag = sut.currentBag(on: nil)
         
-        sut.moveToNextElement()
+        sut.moveToNextElement(on: nil)
         XCTAssertTrue(sut.id === prevId, "id reference has changed")
-        XCTAssertNil(sut.buffer)
         XCTAssertEqual(sut.currentTableIndex, prevCurrentTableIndex)
-        XCTAssertTrue(sut.currentBag === prevCurrentBag, "currentBag reference has changed")
+        XCTAssertTrue(sut.currentBag(on: nil) === prevCurrentBag, "currentBag reference has changed")
     }
     
     func testMoveToNextElement_whenBufferIsNotNilAndIsEndIndex_thenNothingHappens() {
         let ht = givenNotEmptyHashTable()
         sut = _Index(asEndIndexOf: ht)
-        let prevBuffer = sut.buffer
         let prevId = sut.id
         let prevCurrentTableIndex = sut.currentTableIndex
-        let prevCurrentBag = sut.currentBag
+        let prevCurrentBag = sut.currentBag(on: ht.buffer)
         
-        sut.moveToNextElement()
+        sut.moveToNextElement(on: ht.buffer)
         XCTAssertTrue(sut.id === prevId, "id reference has changed")
-        XCTAssertTrue(sut.buffer === prevBuffer, "buffer reference has changed")
         XCTAssertEqual(sut.currentTableIndex, prevCurrentTableIndex)
-        XCTAssertTrue(sut.currentBag === prevCurrentBag, "currentBag reference has changed")
+        XCTAssertTrue(sut.currentBag(on: ht.buffer) === prevCurrentBag, "currentBag reference has changed")
     }
     
     func testMoveToNextElement_whenIsInRangeIndex_thenMovesToNextElement() {
         let ht = givenNotEmptyHashTable()
         sut = _Index(asStartIndexOf: ht)
         for (key, value) in ht {
-            XCTAssertEqual(key, sut.currentBag?.key)
-            XCTAssertEqual(value, sut.currentBag?.value)
-            sut.moveToNextElement()
+            XCTAssertEqual(key, sut.currentBag(on: ht.buffer)?.key)
+            XCTAssertEqual(value, sut.currentBag(on: ht.buffer)?.value)
+            sut.moveToNextElement(on: ht.buffer)
         }
-        XCTAssertNil(sut.currentBag)
+        XCTAssertNil(sut.currentBag(on: ht.buffer))
         XCTAssertEqual(sut.currentTableIndex, ht.capacity)
     }
     
@@ -230,14 +261,14 @@ final class IndexTests: XCTestCase {
         let otherHT = givenNotEmptyHashTable()
         sut = _Index(asStartIndexOf: ht)
         repeat {
-            XCTAssertEqual(sut.isValidFor(ht), sut.id === ht.id && sut.buffer === ht.buffer)
+            XCTAssertEqual(sut.isValidFor(ht), sut.id === ht.id)
             XCTAssertTrue(sut.isValidFor(ht))
             
-            XCTAssertEqual(sut.isValidFor(otherHT), sut.id === otherHT.id && sut.buffer === otherHT.buffer)
+            XCTAssertEqual(sut.isValidFor(otherHT), sut.id === otherHT.id)
             XCTAssertFalse(sut.isValidFor(otherHT))
             
-            sut.moveToNextElement()
-        } while sut.currentBag != nil
+            sut.moveToNextElement(on: ht.buffer)
+        } while sut.currentBag(on: ht.buffer) != nil
     }
     
     func testAreValid() {
@@ -246,12 +277,12 @@ final class IndexTests: XCTestCase {
         
         var lhs = _Index(asStartIndexOf: ht)
         var rhs = _Index(asStartIndexOf: ht)
-        rhs.moveToNextElement()
+        rhs.moveToNextElement(on: ht.buffer)
         repeat {
             XCTAssertTrue(_Index.areValid(lhs: lhs, rhs: rhs))
-            lhs.moveToNextElement()
-            rhs.moveToNextElement()
-        } while rhs.currentBag != nil
+            lhs.moveToNextElement(on: ht.buffer)
+            rhs.moveToNextElement(on: ht.buffer)
+        } while rhs.currentBag(on: ht.buffer) != nil
         
         // when lhs.id or lhs.buffer are not equal to rhs.id and rhs.buffer,
         // then returns false
@@ -260,24 +291,24 @@ final class IndexTests: XCTestCase {
         rhs = _Index(asStartIndexOf: other)
         repeat {
             XCTAssertFalse(_Index.areValid(lhs: lhs, rhs: rhs))
-            lhs.moveToNextElement()
-            rhs.moveToNextElement()
-        } while lhs.currentBag != nil && rhs.currentBag != nil
+            lhs.moveToNextElement(on: ht.buffer)
+            rhs.moveToNextElement(on: other.buffer)
+        } while lhs.currentBag(on: ht.buffer) != nil && rhs.currentBag(on: other.buffer) != nil
     }
     
     // MARK: - test Comparable conformance
     func testEqual() {
-        // when curentTableIndex are equal and currentBag are equal then returns true,
+        // when curentTableIndex are equal and currentBagOffset are equal then returns true,
         // otherwise returns false
         let ht = givenNotEmptyHashTable()
         var lhs = _Index(asStartIndexOf: ht)
         var rhs = _Index(asStartIndexOf: ht)
         repeat {
             XCTAssertEqual(lhs, rhs)
-            lhs.moveToNextElement()
+            lhs.moveToNextElement(on: ht.buffer)
             XCTAssertNotEqual(lhs, rhs)
-            rhs.moveToNextElement()
-        } while lhs.currentBag != nil && rhs.currentBag != nil
+            rhs.moveToNextElement(on: ht.buffer)
+        } while lhs.currentBag(on: ht.buffer) != nil && rhs.currentBag(on: ht.buffer) != nil
     }
     
     func testLessThan() {
@@ -285,23 +316,22 @@ final class IndexTests: XCTestCase {
         let htKeys = ht.map { $0.key }
         var lhs = _Index(asStartIndexOf: ht)
         var rhs = _Index(asStartIndexOf: ht)
-        while lhs.currentBag != nil && rhs.currentBag != nil {
-            rhs.moveToNextElement()
+        while lhs.currentBag(on: ht.buffer) != nil && rhs.currentBag(on: ht.buffer) != nil {
+            rhs.moveToNextElement(on: ht.buffer)
             
             XCTAssertLessThan(lhs, rhs)
             XCTAssertGreaterThan(rhs, lhs)
-            let lhsKeyPosition = lhs.currentBag?.key != nil ? htKeys.firstIndex(of: lhs.currentBag!.key)! : htKeys.count
-            let rhsKeyPosition = rhs.currentBag?.key != nil ? htKeys.firstIndex(of: rhs.currentBag!.key)! : htKeys.count
+            let lhsKeyPosition = lhs.currentBag(on: ht.buffer)?.key != nil ? htKeys.firstIndex(of: lhs.currentBag(on: ht.buffer)!.key)! : htKeys.count
+            let rhsKeyPosition = rhs.currentBag(on: ht.buffer)?.key != nil ? htKeys.firstIndex(of: rhs.currentBag(on: ht.buffer)!.key)! : htKeys.count
             XCTAssertLessThan(lhsKeyPosition, rhsKeyPosition)
             
-            lhs.moveToNextElement()
+            lhs.moveToNextElement(on: ht.buffer)
             XCTAssertEqual(lhs, rhs)
             XCTAssertFalse(lhs < rhs)
             XCTAssertFalse(rhs < lhs)
             XCTAssertFalse(rhs > lhs)
             XCTAssertFalse(lhs > rhs)
         }
-        
     }
     
 }

@@ -98,41 +98,37 @@ final class COWHelpersTests: XCTestCase {
     }
     
     // MARK: - Tests
-    func testMakeUnique_whenBufferIsNil_thenInstanciatesNewBufferOfMinCapacity() {
+    func testMakeUnique_whenBufferIsNil_thenInstanciatesNewBufferOfMinCapacityAndChangesID() {
         sut = HashTable()
-        weak var prevID = sut.id
+        let prevID = sut.id
         
         sut.makeUnique()
         XCTAssertNotNil(sut.buffer)
         XCTAssertEqual(sut.capacity, minBufferCapacity)
-        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
-        XCTAssertNil(prevID, "has not deallocated previous id reference")
+        XCTAssertFalse(sut.id === prevID, "has not changed id")
     }
     
-    func testMakeUnique_whenBufferIsNotNil_thenCopiesBufferWhenNotUniquivelyReferenced() {
+    func testMakeUnique_whenBufferIsNotNil_thenCopiesBufferWhenNotUniquivelyReferencedButKeepsSameId() {
         // sut.buffer is uniquively referenced
-        weak var prevID = sut.id
         weak var prevBuffer = sut.buffer
+        let prevID = sut.id
         
         sut.makeUnique()
-        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
-        XCTAssertNil(prevID, "has not deallocated previous id reference")
         XCTAssertTrue(sut.buffer === prevBuffer, "has copied buffer when not supposed to")
+        XCTAssertTrue(sut.id === prevID, "has changed id")
         
         // sut.buffer has more strong references
         let otherStrongReferenceToBuffer = sut.buffer
-        prevID = sut.id
         prevBuffer = sut.buffer
         
         sut.makeUnique()
-        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
-        XCTAssertNil(prevID, "has not deallocated previous id reference")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer when supposed to")
         XCTAssertEqual(sut.buffer, prevBuffer, "has not copied elements")
+        XCTAssertTrue(sut.id === prevID, "has changed id")
         XCTAssertTrue(otherStrongReferenceToBuffer === prevBuffer)
     }
     
-    func testMakeUniqueReservingMinimumCapacity_whenFreeCapacityIsGreaterThanOrEqaultToMinimumCapacity_thenCopyBufferIfIsNotUniquelyReferenced() {
+    func testMakeUniqueReservingMinimumCapacity_whenFreeCapacityIsGreaterThanOrEqaultToMinimumCapacity_thenCopyBufferIfIsNotUniquelyReferencedAndKeepsSameId() {
         let freeCapacity = sut.capacity - sut.count
         var minimumCapacity = freeCapacity
         
@@ -142,7 +138,7 @@ final class COWHelpersTests: XCTestCase {
             
             sut.makeUniqueReserving(minimumCapacity: minimumCapacity)
             XCTAssertTrue(sut.buffer === prevBuffer, "has copied buffer when not supposed to")
-            XCTAssertFalse(sut.id === prevID, "has not changed id reference")
+            XCTAssertTrue(sut.id === prevID, "has changed id")
             minimumCapacity -= 1
         }
         
@@ -154,36 +150,34 @@ final class COWHelpersTests: XCTestCase {
             sut.makeUniqueReserving(minimumCapacity: minimumCapacity)
             XCTAssertFalse(sut.buffer === otherStrongReferenceToBuffer, "has not copied buffer when supposed to")
             XCTAssertEqual(sut.buffer, otherStrongReferenceToBuffer)
-            XCTAssertFalse(sut.id === prevID, "has not changed id reference")
+            XCTAssertTrue(sut.id === prevID, "has changed id")
             minimumCapacity -= 1
         }
     }
     
-    func testMakeUniqueReservingMinimumCapacity_whenFreeCapacityIsLessThanMinimumCapacity_thenCopiesBufferToABiggerOneWithFreeCapacityGreaterThanOrEqualToMinCapacity() {
+    func testMakeUniqueReservingMinimumCapacity_whenFreeCapacityIsLessThanMinimumCapacity_thenCopiesBufferToABiggerOneWithFreeCapacityGreaterThanOrEqualToMinCapacityAndChangesId() {
         let freeCapacity = sut.capacity - sut.count
+        let minimumCapacity = freeCapacity + 1
+        let prevID = sut.id
+        let prevBuffer = sut.buffer
         
-        var minimumCapacity = freeCapacity + 1
-        while minimumCapacity < freeCapacity + 20 {
-            weak var prevID = sut.id
-            let prevBuffer = sut.buffer
-            
-            sut.makeUniqueReserving(minimumCapacity: minimumCapacity)
-            XCTAssertFalse(sut.id === prevID, "has not changed id reference")
-            XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
-            XCTAssertGreaterThanOrEqual(sut.capacity, minimumCapacity)
-            if sut.buffer?.count == prevBuffer?.count {
-                for k in containedKeys {
-                    XCTAssertEqual(sut.buffer?.getValue(forKey: k), prevBuffer?.getValue(forKey: k))
-                }
-            } else { XCTFail("has not done right the copy of the elements") }
-            minimumCapacity += 1
+        sut.makeUniqueReserving(minimumCapacity: minimumCapacity)
+        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
+        XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
+        XCTAssertGreaterThanOrEqual(sut.capacity, minimumCapacity)
+        if sut.buffer?.count == prevBuffer?.count {
+            for k in containedKeys {
+                XCTAssertEqual(sut.buffer?.getValue(forKey: k), prevBuffer?.getValue(forKey: k))
+            }
+        } else {
+            XCTFail("has not done right the copy of the elements")
         }
     }
     
-    func testMakeUniqueReservingMinimumCapacity_whenBufferIsNil_thenClonesToNewBufferWithCapacityGreaterThanOrEqualToMinimumCapacity() {
+    func testMakeUniqueReservingMinimumCapacity_whenBufferIsNil_thenClonesToNewBufferWithCapacityGreaterThanOrEqualToMinimumCapacityAndChangesId() {
         for mc in 0..<20 {
             sut = HashTable()
-            weak var prevID = sut.id
+            let prevID = sut.id
             
             sut.makeUniqueReserving(minimumCapacity: mc)
             XCTAssertFalse(sut.id === prevID, "has not changed id reference")
@@ -194,11 +188,11 @@ final class COWHelpersTests: XCTestCase {
         }
     }
     
-    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsTooSparse_thenCopiesBufferToASmallerOne() {
+    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsTooSparse_thenCopiesBufferToASmallerOneAndChangesId() {
         whenBufferTableIsTooSparse()
         
         while sut.buffer!.tableIsTooSparse == true {
-            weak var prevID = sut.id
+            let prevID = sut.id
             let prevBuffer = sut.buffer
             let prevCapacity = sut.capacity
             
@@ -210,23 +204,25 @@ final class COWHelpersTests: XCTestCase {
                 for k in containedKeys {
                     XCTAssertEqual(sut.buffer?.getValue(forKey: k), prevBuffer?.getValue(forKey: k))
                 }
-            } else  { XCTFail("has not done right the copy of the elements") }
+            } else  {
+                XCTFail("has not done right the copy of the elements")
+            }
         }
     }
     
-    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsTooSparseAndBufferIsEmpty_thenSetsBufferToNil() {
+    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsTooSparseAndBufferIsEmpty_thenSetsBufferToNilAndChangesId() {
         sut = HashTable(minimumCapacity: minBufferCapacity + Int.random(in: 1...10))
-        weak var prevID = sut.id
+        let prevID = sut.id
         
         sut.makeUniqueEventuallyReducingCapacity()
         XCTAssertFalse(sut.id === prevID, "has not changed id reference")
         XCTAssertNil(sut.buffer)
     }
     
-    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsNotTooSparse_thenClonesBufferIfNotUniquelyReferenced() {
+    func testMakeUniqueEventuallyReducingCapacity_whenBufferTableIsNotTooSparse_thenClonesBufferIfNotUniquelyReferencedAndChangesId() {
         whenBufferTableIsNotTooSparse()
         
-        weak var prevID = sut.id
+        var prevID = sut.id
         weak var prevBuffer = sut.buffer
         
         sut.makeUniqueEventuallyReducingCapacity()
@@ -244,9 +240,9 @@ final class COWHelpersTests: XCTestCase {
         XCTAssertTrue(otherBufferStringReference === prevBuffer, "has changed also the other reference")
     }
     
-    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferIsNil_thenInstanciatesBufferOfMinCapacity() {
+    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferIsNil_thenInstanciatesBufferOfMinCapacityAndChangesId() {
         sut = HashTable()
-        weak var prevID = sut.id
+        let prevID = sut.id
         
         sut.makeUniqueEventuallyIncreasingCapacity()
         XCTAssertFalse(sut.id === prevID, "has not changed id reference")
@@ -254,11 +250,11 @@ final class COWHelpersTests: XCTestCase {
         XCTAssertEqual(sut.capacity, minBufferCapacity)
     }
     
-    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferTableIsTooTight_thenCopiesBufferToLargerOneWithDoubleCapacity() {
+    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferTableIsTooTight_thenCopiesBufferToLargerOneWithDoubleCapacityAndChangesId() {
         whenBufferTableIsTooTight()
         
         while sut.buffer?.tableIsTooTight == true {
-            weak var prevID = sut.id
+            let prevID = sut.id
             let prevBuffer = sut.buffer
             let prevCapacity = sut.capacity
             
@@ -276,13 +272,13 @@ final class COWHelpersTests: XCTestCase {
         }
     }
     
-    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferTableIsNotTooTight_thenClonesBufferIsIsNotUniquelyReferenced() {
+    func testMakeUniqueEventuallyIncreasingCapacity_whenBufferTableIsNotTooTight_thenClonesBufferIfIsNotUniquelyReferencedAndDoesntChangesId() {
         whenBufferTableIsNotTooTight()
-        weak var prevID = sut.id
+        var prevID = sut.id
         weak var prevBuffer = sut.buffer
         
         sut.makeUniqueEventuallyIncreasingCapacity()
-        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
+        XCTAssertTrue(sut.id === prevID, "has changed id")
         XCTAssertTrue(sut.buffer === prevBuffer, "has copied buffer when not supposed to")
         
         let otherBufferStringReference = sut.buffer
@@ -290,7 +286,7 @@ final class COWHelpersTests: XCTestCase {
         prevBuffer = sut.buffer
         
         sut.makeUniqueEventuallyIncreasingCapacity()
-        XCTAssertFalse(sut.id === prevID, "has not changed id reference")
+        XCTAssertTrue(sut.id === prevID, "has changed id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
         XCTAssertEqual(sut.buffer, otherBufferStringReference)
         XCTAssertTrue(otherBufferStringReference === prevBuffer, "has changed also the other reference")

@@ -100,7 +100,7 @@ final class CollectionConformanceTests: XCTestCase {
         var i = sut.startIndex
         while i < sut.endIndex {
             var other = i
-            other.moveToNextElement()
+            other.moveToNextElement(on: sut.buffer)
             sut.formIndex(after: &i)
             XCTAssertEqual(i, other)
         }
@@ -118,7 +118,7 @@ final class CollectionConformanceTests: XCTestCase {
         var i = sut.startIndex
         while i < sut.endIndex {
             let n = sut.index(after: i)
-            i.moveToNextElement()
+            i.moveToNextElement(on: sut.buffer)
             XCTAssertEqual(n, i)
         }
         
