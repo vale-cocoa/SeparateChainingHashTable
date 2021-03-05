@@ -470,9 +470,9 @@ extension SeparateChainingHashTable {
     ///     if let oldValue = hues.updateValue(330, forKey: "Cerise") {
     ///         print("The old value of \(oldValue) was replaced with a new one.")
     ///     } else {
-    ///         print("No value was found in the dictionary for that key.")
+    ///         print("No value was found in the hash table for that key.")
     ///     }
-    ///     // Prints "No value was found in the dictionary for that key."
+    ///     // Prints "No value was found in the hash table for that key."
     ///
     /// - Parameters:
     ///   - value: The new value to add to the hash table.
