@@ -958,23 +958,7 @@ extension SeparateChainingHashTable: Collection {
         
         internal init(asStartIndexOf ht: SeparateChainingHashTable) {
             self.id = ht.id
-            self.currentTableIndex = 0
-            guard
-                !ht.isEmpty
-            else {
-                currentTableIndex = ht.capacity
-                
-                return
-            }
-            
-            while currentTableIndex < ht.capacity {
-                if ht.buffer!.table[currentTableIndex] != nil {
-                    
-                    return
-                } else {
-                    currentTableIndex += 1
-                }
-            }
+            self.currentTableIndex = ht.buffer?.firstTableElement ?? ht.capacity
         }
         
         internal init(asEndIndexOf ht: SeparateChainingHashTable) {

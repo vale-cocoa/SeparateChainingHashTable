@@ -90,6 +90,17 @@ final class HashTableBufferTests: XCTestCase {
         }
     }
     
+    func testFirstTableElement() {
+        // when is empty, then returns capacity value
+        sut = HashTableBuffer(minimumCapacity: Int.random(in: minCapacity..<100))
+        XCTAssertEqual(sut.firstTableElement, sut.capacity)
+        
+        // when is not empty then returns the index to first
+        // non-nil table's element
+        whenIsNotEmpty()
+        assertFirstTableElementIsCorrectIndex(on: sut)
+    }
+    
     func testIsEmpty() {
         sut = HashTableBuffer(minimumCapacity: Int.random(in: minCapacity...10))
         XCTAssertTrue(sut.isEmpty)
@@ -137,6 +148,9 @@ final class HashTableBufferTests: XCTestCase {
         XCTAssertEqual(sut.capacity, clone?.capacity)
         XCTAssertEqual(sut.count, clone?.count)
         XCTAssertNotEqual(sut.table, clone?.table, "not done deep copy of table")
+        if clone != nil {
+            assertFirstTableElementIsCorrectIndex(on: clone!)
+        }
         
         // when isEmpty == false
         whenIsNotEmpty()
@@ -156,8 +170,8 @@ final class HashTableBufferTests: XCTestCase {
                 default: XCTFail("Table was not copied properly")
                 }
             }
+            assertFirstTableElementIsCorrectIndex(on: clone!)
         }
-        
     }
     
     func testHashIndex() {
@@ -199,6 +213,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(sut.updateValue(newValue, forKey: k), expectedValue)
             XCTAssertEqual(sut.getValue(forKey: k), newValue)
             XCTAssertEqual(sut.count, prevCount)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
         
         // when there's no element with k,
@@ -210,6 +225,7 @@ final class HashTableBufferTests: XCTestCase {
         XCTAssertNil(sut.updateValue(newValue, forKey: k))
         XCTAssertEqual(sut.getValue(forKey: k), newValue)
         XCTAssertEqual(sut.count, prevCount + 1)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testSetValueForKeyUniquingKeysWith_whenKeyIsntDuplicate_thenCombineNeverExecutes() {
@@ -278,6 +294,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertTrue(hasExecuted)
             XCTAssertEqual(sut.getValue(forKey: newElement.key), expectedResult[newElement.key])
             XCTAssertEqual(sut.count, prevCount)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
     }
     
@@ -299,6 +316,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(sut.count, prevCount + 1)
             XCTAssertEqual(sut.getValue(forKey: newKey), newValue)
             XCTAssertFalse(hasExecuted)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
     }
     
@@ -311,6 +329,7 @@ final class HashTableBufferTests: XCTestCase {
             sut.setValue(newElement.value, forKey: newElement.key)
             XCTAssertEqual(sut.getValue(forKey: newElement.key), newElement.value)
             XCTAssertEqual(sut.count, prevCount + 1)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
         
         // when element with key exists, then update its value
@@ -321,6 +340,7 @@ final class HashTableBufferTests: XCTestCase {
             sut.setValue(newValue, forKey: oldElement.key)
             XCTAssertEqual(sut.getValue(forKey: oldElement.key), newValue)
             XCTAssertEqual(sut.count, prevCount)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
     }
     
@@ -331,7 +351,7 @@ final class HashTableBufferTests: XCTestCase {
         var result = sut.removeElement(withKey: notContainedKey)
         XCTAssertNil(result)
         XCTAssertEqual(sut, clone)
-        
+        assertFirstTableElementIsCorrectIndex(on: sut)
         
         // when there's element with key, then element is removed
         for k in sutContainedKeys {
@@ -342,8 +362,10 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(result, expectedResult)
             XCTAssertNil(sut.getValue(forKey: k))
             XCTAssertEqual(sut.count, prevCount - 1)
+            assertFirstTableElementIsCorrectIndex(on: sut)
         }
         XCTAssertTrue(sut.isEmpty)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testMergeKeysAndValuesUniquingKeysWith_whenNoDuplicateKeys_thenCombineNeverExecutes() {
@@ -380,20 +402,22 @@ final class HashTableBufferTests: XCTestCase {
         let prev = (sut.copy() as! HashTableBuffer<String, Int>)
         XCTAssertNoThrow(try sut.merge([], uniquingKeysWith: combine))
         XCTAssertEqual(sut, prev)
+        assertFirstTableElementIsCorrectIndex(on: sut)
         
         // when keysAndValues doesn't contain duplicate keys,
         // then adds all elements
         var keysAndValues = givenKeysAndValuesWithoutDuplicateKeys()
             .filter { sut.getValue(forKey: $0.key) == nil }
         var expectedResult = Dictionary(uniqueKeysWithValues: Array(sut))
-        try! expectedResult.merge(keysAndValues, uniquingKeysWith: combine)
         
+        try! expectedResult.merge(keysAndValues, uniquingKeysWith: combine)
         XCTAssertNoThrow(try sut.merge(keysAndValues, uniquingKeysWith: combine))
         XCTAssertEqual(sut.count, expectedResult.count)
         for element in expectedResult {
             XCTAssertEqual(sut.getValue(forKey: element.key), element.value)
         }
         XCTAssertFalse(sut.tableIsTooTight)
+        assertFirstTableElementIsCorrectIndex(on: sut)
         
         // when keysAndValues contains some elements with
         // duplicate keys, then merges accordingly using combine
@@ -407,6 +431,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(sut.getValue(forKey: element.key), element.value)
         }
         XCTAssertFalse(sut.tableIsTooTight)
+        assertFirstTableElementIsCorrectIndex(on: sut)
         
         // repeating this test with keysAndValues not implementing
         // withContiguousBufferWhenAvailable(_:) and
@@ -426,6 +451,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(sut.getValue(forKey: element.key), element.value)
         }
         XCTAssertFalse(sut.tableIsTooTight)
+        assertFirstTableElementIsCorrectIndex(on: sut)
         
         for _ in 0..<300 {
             seq.elements.append((notContainedKey, randomValue()))
@@ -442,6 +468,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(sut.getValue(forKey: element.key), element.value)
         }
         XCTAssertFalse(sut.tableIsTooTight)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testMergeOtherUniquingKeysWith_whenOtherIsEmpty_thenNothingChanges() {
@@ -451,6 +478,7 @@ final class HashTableBufferTests: XCTestCase {
         let other = HashTableBuffer<String, Int>(minimumCapacity: minCapacity)
         XCTAssertNoThrow(try sut.merge(other, uniquingKeysWith: combine))
         XCTAssertEqual(sut, expectedResult)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testMergeOtherUniquingKeysWith_whenOtherIsNotEmptyAndNoDuplicateKeys_thenCombineNeverExecutes() {
@@ -475,6 +503,7 @@ final class HashTableBufferTests: XCTestCase {
         for element in sut {
             XCTAssertEqual(element.value, expectedResult[element.key])
         }
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testMergeOtherUniquingKeysWith_whenCombineThrows_thenRethrows() {
@@ -522,6 +551,7 @@ final class HashTableBufferTests: XCTestCase {
             XCTAssertEqual(element.value, expectedResult[element.key])
         }
         XCTAssertFalse(sut.tableIsTooTight)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testMapValues_whenIsEmpty_thenTranformNeverExecutes() {
@@ -691,6 +721,7 @@ final class HashTableBufferTests: XCTestCase {
         for element in result {
             XCTAssertEqual(element.value, expectedResult[element.key])
         }
+        assertFirstTableElementIsCorrectIndex(on: result)
     }
     
     func testCloneNewCapacity() {
@@ -699,6 +730,7 @@ final class HashTableBufferTests: XCTestCase {
         // then returns copy
         var clone = sut.clone(newCapacity: sut.capacity)
         XCTAssertEqual(sut, clone)
+        assertFirstTableElementIsCorrectIndex(on: clone)
         
         // when newCapacity is different, then returns a copy
         // resized to newCapacity with all elements
@@ -710,6 +742,7 @@ final class HashTableBufferTests: XCTestCase {
         let sortedSutElements = sut!.map { $0 }.sorted(by: { $0.key < $1.key })
         let sortedCloneElements = clone.map { $0 }.sorted(by: { $0.key < $1.key })
         XCTAssertTrue(sortedCloneElements.elementsEqual(sortedSutElements, by: { $0.key == $1.key && $0.value == $1.value }))
+        assertFirstTableElementIsCorrectIndex(on: clone)
     }
     
     func testResizeTo_whenNewCapacityIsEqualToCapacity_thenNothingHappens() {
@@ -720,6 +753,7 @@ final class HashTableBufferTests: XCTestCase {
         sut.resizeTo(newCapacity: sut.capacity)
         XCTAssertEqual(sut.table, prevTable)
         XCTAssertEqual(sut, expectedResult)
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testResizeTo_whenNewCapacityIsDifferentFromCapacity_thenResizesTableToNewCapacity() {
@@ -735,6 +769,8 @@ final class HashTableBufferTests: XCTestCase {
                 XCTAssertEqual(element.value, expectedElements[element.key])
             }
         }
+        assertFirstTableElementIsCorrectIndex(on: sut)
+        
         let largerCapacity = prevCapacity + 1
         prevCapacity = sut.capacity
         sut.resizeTo(newCapacity: largerCapacity)
@@ -743,6 +779,7 @@ final class HashTableBufferTests: XCTestCase {
         for element in sut {
             XCTAssertEqual(element.value, expectedElements[element.key])
         }
+        assertFirstTableElementIsCorrectIndex(on: sut)
     }
     
     func testUnderestimatedCount() {

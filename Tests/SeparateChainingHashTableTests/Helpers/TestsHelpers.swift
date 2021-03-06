@@ -232,6 +232,16 @@ func assertEqualButDifferentReference<Key: Hashable, Value: Equatable>(lhs: Hash
     XCTAssertTrue(areEqualAndDifferentReference(lhs: lhs, rhs: rhs), message ?? "", file: file, line: line)
 }
 
+func assertFirstTableElementIsCorrectIndex<Key: Hashable, Value>(on buffer: HashTableBuffer<Key, Value>, message: String? = nil, file: StaticString = #file, line: UInt = #line) {
+    var fIdx = buffer.capacity
+    for idx in 0..<buffer.capacity where buffer.table[idx] != nil {
+        fIdx = idx
+        break
+    }
+    
+    XCTAssertEqual(buffer.firstTableElement, fIdx, "\(message ?? "")", file: file, line: line)
+}
+
 // MARK: - equality helpers
 func areEqual<Key: Hashable, Value: Equatable>(lhs: HashTableBuffer<Key, Value>.Bag?, rhs: HashTableBuffer<Key, Value>.Bag?) -> Bool {
     guard lhs !== rhs else { return true }

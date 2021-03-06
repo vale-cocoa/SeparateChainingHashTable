@@ -33,6 +33,8 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
     
     private(set) var table: UnsafeMutablePointer<Bag?>
     
+    private(set) var firstTableElement: Int
+    
     private(set) var capacity: Int
     
     private(set) var count: Int
@@ -52,12 +54,15 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         self.table = UnsafeMutablePointer.allocate(capacity: capacity)
         
         self.table.initialize(repeating: nil, count: capacity)
+        
+        self.firstTableElement = capacity
     }
     
-    private init(capacity: Int, count: Int, table: UnsafeMutablePointer<Bag?>) {
+    private init(capacity: Int, count: Int, table: UnsafeMutablePointer<Bag?>, firstTableElementIndex: Int) {
         self.capacity = capacity
         self.count = count
         self.table = table
+        self.firstTableElement = firstTableElementIndex
     }
     
     deinit {
@@ -70,9 +75,19 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         for idx in 0..<capacity {
             tableCopy.advanced(by: idx).initialize(to: table[idx]?.copy(with: zone) as? Bag)
         }
-        let clone = HashTableBuffer(capacity: capacity, count: count, table: tableCopy)
+        let clone = HashTableBuffer(capacity: capacity, count: count, table: tableCopy, firstTableElementIndex: firstTableElement)
         
         return clone
+    }
+    
+    @inlinable
+    func updateFirstTableElement() {
+        firstTableElement = capacity
+        for idx in 0..<capacity where table[idx] != nil {
+            firstTableElement = idx
+            
+            break
+        }
     }
     
     @inlinable
@@ -105,6 +120,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         guard let bag = table[idx] else {
             table[idx] = Bag(key: k, value: v)
             count += 1
+            if idx < firstTableElement { firstTableElement = idx }
             
             return nil
         }
@@ -126,6 +142,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
             let bag = Bag(key: k, value: v)
             table[idx] = bag
             count += 1
+            if idx < firstTableElement { firstTableElement = idx }
             
             return
         }
@@ -154,8 +171,12 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         let prevBagCount = bag.count
         let r = bag.removingValue(forKey: k)
         table[idx] = r.afterRemoval
-        if prevBagCount > (table[idx]?.count ?? 0) {
+        let actualBagCount = table[idx]?.count ?? 0
+        if prevBagCount > actualBagCount {
             count -= 1
+            if actualBagCount == 0 && idx <= firstTableElement {
+                updateFirstTableElement()
+            }
         }
         
         return r.removedValue
@@ -226,37 +247,47 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
             }
         }
         
-        return HashTableBuffer<Key, T>.init(capacity: capacity, count: count, table: mappedTable)
+        return HashTableBuffer<Key, T>.init(capacity: capacity, count: count, table: mappedTable, firstTableElementIndex: firstTableElement)
     }
     
     @inlinable
     func compactMapValues<T>(_ transform: (Value) throws -> T?) rethrows -> HashTableBuffer<Key, T> {
         let mappedTable = UnsafeMutablePointer<HashTableBuffer<Key, T>.Bag?>.allocate(capacity: capacity)
         var newCount = 0
+        var mappedFirstTableIndex = capacity
         for idx in 0..<capacity {
             var mappedBag: HashTableBuffer<Key, T>.Bag? = nil
             if let bag = table[idx] {
                 mappedBag = try bag.compactMapValue(transform)
             }
             mappedTable.advanced(by: idx).initialize(to: mappedBag)
-            newCount += mappedBag?.count ?? 0
+            let mappedBagCount = mappedBag?.count ?? 0
+            newCount += mappedBagCount
+            if mappedBagCount > 0 && idx < mappedFirstTableIndex {
+                mappedFirstTableIndex = idx
+            }
         }
         
-        return HashTableBuffer<Key, T>(capacity: capacity, count: newCount, table: mappedTable)
+        return HashTableBuffer<Key, T>(capacity: capacity, count: newCount, table: mappedTable, firstTableElementIndex: mappedFirstTableIndex)
     }
     
     @inlinable
     func filter(_ isIncluded: (Element) throws -> Bool) rethrows -> HashTableBuffer {
         let filteredTable = UnsafeMutablePointer<Bag?>.allocate(capacity: capacity)
         var filteredCount = 0
+        var filteredFirstTableIndex = capacity
         for idx in 0..<capacity {
             try filteredTable
                 .advanced(by: idx)
                 .initialize(to: table[idx]?.clone().filter(isIncluded))
-            filteredCount += filteredTable[idx]?.count ?? 0
+            let thisFilteredBagCount = filteredTable[idx]?.count ?? 0
+            filteredCount += thisFilteredBagCount
+            if thisFilteredBagCount > 0 && idx < filteredFirstTableIndex {
+                filteredFirstTableIndex = idx
+            }
         }
         
-        return HashTableBuffer(capacity: capacity, count: filteredCount, table: filteredTable)
+        return HashTableBuffer(capacity: capacity, count: filteredCount, table: filteredTable, firstTableElementIndex: filteredFirstTableIndex)
     }
     
     @inlinable
@@ -268,6 +299,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         
         let cloneTable = UnsafeMutablePointer<Bag?>.allocate(capacity: k)
         cloneTable.initialize(repeating: nil, count: k)
+        var cloneFirstTableIndex = k
         for thisIdx in 0..<capacity {
             var clonedBag: Bag? = table[thisIdx]?.clone()
             while let element = clonedBag?.element {
@@ -278,10 +310,13 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
                     cloneTable[idx] = Bag(element)
                 }
                 clonedBag = clonedBag?.next
+                if idx < cloneFirstTableIndex {
+                    cloneFirstTableIndex = idx
+                }
             }
         }
         
-        return HashTableBuffer(capacity: k, count: count, table: cloneTable)
+        return HashTableBuffer(capacity: k, count: count, table: cloneTable, firstTableElementIndex: cloneFirstTableIndex)
     }
     
     @inlinable
@@ -293,6 +328,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         
         let newTable = UnsafeMutablePointer<Bag?>.allocate(capacity: newCapacity)
         newTable.initialize(repeating: nil, count: newCapacity)
+        firstTableElement = newCapacity
         for idx in 0..<capacity {
             let bag = self.table.advanced(by: idx).move()
             if let oldBag = bag {
@@ -302,6 +338,9 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
                         newBag.setValue(element.value, forKey: element.key)
                     } else {
                         newTable[newIdx] = Bag(element)
+                    }
+                    if newIdx < firstTableElement {
+                        firstTableElement = newIdx
                     }
                 }
             }
@@ -320,7 +359,7 @@ extension HashTableBuffer: Sequence {
     var underestimatedCount: Int { count }
     
     func makeIterator() -> AnyIterator<Element> {
-        var currentIdx: Int = 0
+        var currentIdx: Int = firstTableElement
         var currentBagIterator: AnyIterator<Element>?
  
         return AnyIterator { 

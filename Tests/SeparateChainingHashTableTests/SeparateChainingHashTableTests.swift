@@ -872,16 +872,11 @@ final class SeparateChainingHashTableTests: XCTestCase {
         whenIsNotEmpty()
         var prevID = sut.id
         weak var prevBuffer = sut.buffer
-        var prevCapacity = sut.capacity
         var copy = sut
         var other = HashTable(uniqueKeysWithValues: givenKeysAndValuesWithoutDuplicateKeys())
         
         sut.merge(other, uniquingKeysWith: +)
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
+        XCTAssertFalse(sut.id === prevID, "should have updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
         XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
@@ -890,16 +885,11 @@ final class SeparateChainingHashTableTests: XCTestCase {
         whenIsNotEmpty()
         prevID = sut.id
         prevBuffer = sut.buffer
-        prevCapacity = sut.capacity
         copy = sut
         other = HashTable()
         
         sut.merge(other, uniquingKeysWith: +)
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
+        XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
         XCTAssertTrue(sut.buffer === prevBuffer, "has copied buffer")
         XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
