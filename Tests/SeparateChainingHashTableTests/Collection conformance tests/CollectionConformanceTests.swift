@@ -296,7 +296,7 @@ final class CollectionConformanceTests: XCTestCase {
         }
         // otherwise when key is not contained, then returns nil
         for _ in 0..<10 {
-            XCTAssertNil(sut[notContainedKey])
+            XCTAssertNil(sut.index(forKey: notContainedKey))
         }
     }
     
