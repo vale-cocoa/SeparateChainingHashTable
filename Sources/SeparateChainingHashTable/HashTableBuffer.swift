@@ -132,7 +132,6 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         return result
     }
     
-    @inlinable
     func setValue(_ v: Value, forKey k: Key, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
         let idx = hashIndex(forKey: k)
         
@@ -182,6 +181,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         return r.removedValue
     }
     
+    @inlinable
     func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
         if let other = keysAndValues as? HashTableBuffer {
             try merge(other, uniquingKeysWith: combine)
@@ -223,6 +223,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         }
     }
     
+    @inlinable
     func merge(_ other: HashTableBuffer, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
         guard
             !other.isEmpty
@@ -356,6 +357,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
 extension HashTableBuffer: Sequence {
     typealias Element = (key: Key, value: Value)
     
+    @inlinable
     var underestimatedCount: Int { count }
     
     func makeIterator() -> AnyIterator<Element> {
@@ -469,7 +471,6 @@ extension HashTableBuffer {
         }
         
         @discardableResult
-        @inlinable
         func getValue(forKey k: Key) -> Value? {
             guard key != k else { return value }
             
@@ -477,7 +478,6 @@ extension HashTableBuffer {
         }
         
         @discardableResult
-        @inlinable
         func updateValue(_ v: Value, forKey k: Key) -> Value? {
             guard
                 k != key
@@ -503,7 +503,6 @@ extension HashTableBuffer {
             return result
         }
         
-        @inlinable
         func setValue(_ v: Value, forKey k: Key, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
             guard key != k else {
                 let newValue = try combine(value, v)
@@ -528,7 +527,6 @@ extension HashTableBuffer {
             setValue(v, forKey: k, uniquingKeysWith: { _, new in new })
         }
         
-        @inlinable
         func removingValue(forKey k: Key) -> (afterRemoval: Bag?, removedValue: Value?) {
             guard k != key else {
                 let n = next
@@ -568,7 +566,6 @@ extension HashTableBuffer {
             return mappedBag
         }
         
-        @inlinable
         func filter(_ isIncluded: (Element) throws -> Bool) rethrows -> Bag? {
             guard
                 try isIncluded(element)
@@ -591,9 +588,8 @@ extension HashTableBuffer {
 }
 
 extension HashTableBuffer.Bag: Sequence {
-    var underestimatedCount: Int {
-        count
-    }
+    @inlinable
+    var underestimatedCount: Int { count }
     
     func makeIterator() -> AnyIterator<Element> {
         unowned(unsafe) var current: HashTableBuffer.Bag? = self

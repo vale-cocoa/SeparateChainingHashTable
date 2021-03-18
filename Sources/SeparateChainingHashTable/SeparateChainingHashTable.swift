@@ -821,6 +821,7 @@ extension SeparateChainingHashTable {
 
 // MARK: - C.O.W. internal utilities
 extension SeparateChainingHashTable {
+    @inline(__always)
     mutating func makeUniqueEventuallyIncreasingCapacity() {
         guard
             (buffer?.tableIsTooTight ?? false)
@@ -834,6 +835,7 @@ extension SeparateChainingHashTable {
         buffer = buffer!.clone(newCapacity: capacity * 2)
     }
     
+    @inline(__always)
     mutating func makeUniqueEventuallyReducingCapacity() {
         id = ID()
         guard
@@ -856,6 +858,7 @@ extension SeparateChainingHashTable {
         buffer = buffer!.clone(newCapacity: mCapacity)
     }
     
+    @inline(__always)
     mutating func makeUniqueReserving(minimumCapacity k: Int) {
         assert(k >= 0, "minimumCapacity musty not be negative")
         guard
@@ -871,6 +874,7 @@ extension SeparateChainingHashTable {
         buffer = buffer?.clone(newCapacity: mCapacity) ?? HashTableBuffer(minimumCapacity: mCapacity)
     }
     
+    @inline(__always)
     mutating func makeUnique() {
         guard buffer != nil else {
             id = ID()
@@ -909,6 +913,7 @@ extension SeparateChainingHashTable: Sequence {
     /// A value equal to the number of key-value pairs stored in the hash table.
     ///
     /// - Complexity: O(1).
+    @inlinable
     public var underestimatedCount: Int { count }
     
     /// Returns an iterator over the hash table's key-value pairs.
@@ -1054,13 +1059,13 @@ extension SeparateChainingHashTable: Collection {
             lhs.id === rhs.id
         }
         
+        // MARK: - Index Comparable conformance
         public static func == (lhs: Index, rhs: Index) -> Bool {
             precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
             
             return lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBagOffset == rhs.currentBagOffset
         }
         
-        // MARK: - Index Comparable conformance
         public static func < (lhs: Index, rhs: Index) -> Bool {
             precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
             guard
