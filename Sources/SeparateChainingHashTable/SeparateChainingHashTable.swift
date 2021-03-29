@@ -174,7 +174,13 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     /// - Returns: A new hash table initialized with the elements of
     ///   `keysAndValues`.
     /// - Precondition: The sequence must not have duplicate keys.
-    public init<S: Sequence>(uniqueKeysWithValues keysAndValues: S) where S.Iterator.Element == Element {
+    public init<S: Sequence>(uniqueKeysWithValues keysAndValues: S) where S.Iterator.Element == (Key, Value) {
+        if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
+            self.init(other)
+            
+            return
+        }
+        
         self.init(keysAndValues) { _, _ in
             preconditionFailure("keys must be unique")
         }
@@ -210,7 +216,7 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     ///   - combine:    A closure that is called with the values for any
     ///                 duplicate keys that are encountered.
     ///                 The closure returns the desired value for the final hash table.
-    public init<S>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Iterator.Element == Element {
+    public init<S>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S : Sequence, S.Iterator.Element == (Key, Value) {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             self.init(other)
             
@@ -225,19 +231,19 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
                 else { return true }
                 
                 newBuffer = HashTableBuffer(minimumCapacity: Swift.max(Self.minBufferCapacity, (kvBuffer.count * 3) / 2))
-                for keyValuePair in keysAndValues {
-                    try newBuffer!.setValue(keyValuePair.value, forKey: keyValuePair.key, uniquingKeysWith: combine)
+                for (key, value) in keysAndValues {
+                    try newBuffer!.setValue(value, forKey: key, uniquingKeysWith: combine)
                 }
                 
                 return true
             } ?? false
         if !done {
             var kvIter = keysAndValues.makeIterator()
-            if let firstElement = kvIter.next() {
+            if let (firstKey, firstValue) = kvIter.next() {
                 newBuffer = HashTableBuffer(minimumCapacity: Swift.max(Self.minBufferCapacity, (keysAndValues.underestimatedCount * 3) / 2))
-                try newBuffer!.setValue(firstElement.value, forKey: firstElement.key, uniquingKeysWith: combine)
-                while let element = kvIter.next() {
-                    try newBuffer!.setValue(element.value, forKey: element.key, uniquingKeysWith: combine)
+                try newBuffer!.setValue(firstValue, forKey: firstKey, uniquingKeysWith: combine)
+                while let (key, value) = kvIter.next() {
+                    try newBuffer!.setValue(value, forKey: key, uniquingKeysWith: combine)
                     if newBuffer!.tableIsTooTight {
                         newBuffer!.resizeTo(newCapacity: newBuffer!.capacity * 2)
                     }
@@ -596,7 +602,7 @@ extension SeparateChainingHashTable {
     ///   - combine:    A closure that takes the current and new values for any
     ///                 duplicate keys. The closure returns the desired value
     ///                 for the final hash table.
-    public mutating func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
+    public mutating func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == (Key, Value) {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             try merge(other, uniquingKeysWith: combine)
         } else {
@@ -713,7 +719,7 @@ extension SeparateChainingHashTable {
     ///                 for the final hash table.
     /// - Returns:  A new hash table with the combined keys and values
     ///             of this hash table and `other`.
-    func merging<S>(_ other: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable where S : Sequence, S.Element == Element {
+    func merging<S>(_ other: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows -> SeparateChainingHashTable where S : Sequence, S.Element == (Key, Value) {
         if let otherHT = other as? SeparateChainingHashTable {
             
             return try merging(otherHT, uniquingKeysWith: combine)
@@ -1263,10 +1269,7 @@ extension SeparateChainingHashTable: Codable where Key: Codable, Value: Codable 
             keys.count == values.count
         else { throw Error.keysAndValuesCountsNotMatching }
         
-        let keysAndValues = zip(keys, values)
-            .lazy
-            .map { (key: $0.0, value: $0.1) }
-        try self.init(keysAndValues, uniquingKeysWith: { _, _ in
+        try self.init(zip(keys, values), uniquingKeysWith: { _, _ in
             throw Error.duplicateKeys
         })
     }

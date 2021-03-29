@@ -182,7 +182,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
     }
     
     @inlinable
-    func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == Element {
+    func merge<S: Sequence>(_ keysAndValues: S, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows where S.Iterator.Element == (Key, Value) {
         if let other = keysAndValues as? HashTableBuffer {
             try merge(other, uniquingKeysWith: combine)
             
@@ -197,8 +197,8 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
                 
                 let newCapacity = self.count + kvBuffer.count >= self.capacity ? Swift.max((((self.count + kvBuffer.count) * 3) / 2), self.capacity * 2) : capacity
                 self.resizeTo(newCapacity: newCapacity)
-                for keyValuePair in kvBuffer {
-                    try self.setValue(keyValuePair.value, forKey: keyValuePair.key, uniquingKeysWith: combine)
+                for (key, value) in kvBuffer {
+                    try self.setValue(value, forKey: key, uniquingKeysWith: combine)
                 }
                 
                 return true
@@ -207,15 +207,15 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
         
         var otherIter = keysAndValues.makeIterator()
         guard
-            let firstOther = otherIter.next()
+            let (firstKey, firstValue) = otherIter.next()
         else { return }
         
         let additionalCount = Swift.max(1, keysAndValues.underestimatedCount)
         let newCapacity = count + additionalCount >= capacity ? capacity : Swift.max((((count + additionalCount) * 3) / 2), capacity * 2)
         resizeTo(newCapacity: newCapacity)
-        try self.setValue(firstOther.value, forKey: firstOther.key, uniquingKeysWith: combine)
-        while let otherElement = otherIter.next() {
-            try self.setValue(otherElement.value, forKey: otherElement.key, uniquingKeysWith: combine)
+        try self.setValue(firstValue, forKey: firstKey, uniquingKeysWith: combine)
+        while let (key, value) = otherIter.next() {
+            try self.setValue(value, forKey: key, uniquingKeysWith: combine)
             if tableIsTooTight {
                 let newCapacity = Swift.max((count * 3 / 2), capacity * 2)
                 resizeTo(newCapacity: newCapacity)

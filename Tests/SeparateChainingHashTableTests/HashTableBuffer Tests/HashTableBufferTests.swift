@@ -437,7 +437,7 @@ final class HashTableBufferTests: XCTestCase {
         // withContiguousBufferWhenAvailable(_:) and
         // having its underEstimatedCount less than its real
         // elements count or 0
-        var seq = Seq(keysAndValues)
+        var seq = Seq<(String, Int)>(keysAndValues)
         XCTAssertEqual(seq.underestimatedCount, 0)
         for _ in 0..<100 {
             seq.elements.append((notContainedKey, randomValue()))

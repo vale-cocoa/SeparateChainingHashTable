@@ -103,19 +103,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
             XCTAssertEqual(sut.buffer?.getValue(forKey: expectedElement.key), expectedElement.value)
         }
         
-        sut = nil
-        // when keysAndValues is another instance of SeparateChainingHashTable, then
-        // it sets buffer to other.buffer
-        let other = HashTable(uniqueKeysWithValues: keysAndValues)
-        sut = HashTable(uniqueKeysWithValues: other)
-        XCTAssertTrue(sut.buffer === other.buffer, "set buffer to wrong instance")
-    }
-    
-    func testInitUniquingKeysWith_whenKeysAndValuesIsAnotherHashTableInstance_thenSetsBufferToOthersBuffer() {
-        let other = HashTable(uniqueKeysWithValues: givenKeysAndValuesWithoutDuplicateKeys())
-        XCTAssertNoThrow(sut = try HashTable(other, uniquingKeysWith: {_, _ in throw err }))
-        XCTAssertNotNil(sut)
-        XCTAssertTrue(sut.buffer === other.buffer)
     }
     
     func testInitUniquingKeysWith_whenKeysAndValuesDoesntContainDuplicateKeys_thenCombineNeverExecutes() {
@@ -168,7 +155,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
         // keysAndValues is a sequence which doesn't
         // implements withContiguousStorageIfAvailable
         // and returns 0 for underestimatedCount
-        var seq = Seq(keysAndValues)
+        var seq = Seq<(String, Int)>(keysAndValues)
         seq.ucIsZero = true
         XCTAssertNoThrow(sut = try HashTable(seq, uniquingKeysWith: combine))
         XCTAssertNotNil(sut)
