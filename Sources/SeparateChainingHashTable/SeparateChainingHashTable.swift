@@ -900,10 +900,13 @@ extension SeparateChainingHashTable {
 extension SeparateChainingHashTable: Sequence {
     /// An iterator over the members of a `SeparateChainingHashTable<Key, Value>`.
     public struct Iterator: IteratorProtocol {
+        private let ht: SeparateChainingHashTable
+        
         private var bufferIterator: AnyIterator<Element>?
         
-        fileprivate init(buffer: HashTableBuffer<Key, Value>?) {
-            self.bufferIterator = buffer?.makeIterator()
+        fileprivate init(ht: SeparateChainingHashTable) {
+            self.ht = ht
+            self.bufferIterator = ht.buffer?.makeIterator()
         }
         
         public mutating func next() -> Element? {
@@ -940,7 +943,7 @@ extension SeparateChainingHashTable: Sequence {
     /// - Returns:  An iterator over the hash table with elements of type
     ///             `(key: Key, value: Value)`.
     public func makeIterator() -> Iterator {
-        Iterator(buffer: buffer)
+        Iterator(ht: self)
     }
     
 }
