@@ -904,22 +904,34 @@ extension SeparateChainingHashTable: Sequence {
         
         private var bufferIterator: AnyIterator<Element>?
         
+        private var nextElement: Element?
+        
         fileprivate init(ht: SeparateChainingHashTable) {
             self.htBuffer = ht.buffer
             self.bufferIterator = ht.buffer?.makeIterator()
+            moveToNextElement()
         }
         
         public mutating func next() -> Element? {
-            guard bufferIterator != nil else { return nil }
-            
-            let nextElement = bufferIterator?.next()
-            if nextElement == nil {
-                htBuffer = nil
-                bufferIterator = nil
-            }
+            defer { moveToNextElement() }
             
             return nextElement
         }
+        
+        private mutating func moveToNextElement() {
+            guard bufferIterator != nil else { return }
+            
+            nextElement = bufferIterator!.next()
+            guard
+                nextElement != nil
+            else {
+                bufferIterator = nil
+                htBuffer = nil
+                
+                return
+            }
+        }
+        
     }
     
     /// A value equal to the number of key-value pairs stored in the hash table.
