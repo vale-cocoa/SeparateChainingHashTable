@@ -173,55 +173,6 @@ final class CollectionConformanceTests: XCTestCase {
         }
     }
     
-    func testFormIndexOffsetByLimitedBy() {
-        // when is empty and distance is 0,
-        // then returns true and i is endIndex
-        XCTAssertTrue(sut.isEmpty)
-        var i = sut.startIndex
-        var end = sut.endIndex
-        XCTAssertTrue(sut.formIndex(&i, offsetBy: 0, limitedBy: end))
-        XCTAssertEqual(i, end)
-        
-        // when is empty and distance is greater than 0,
-        // then returns false and i is endIndex
-        for distance in 1..<10 {
-            i = sut.startIndex
-            end = sut.endIndex
-            XCTAssertFalse(sut.formIndex(&i, offsetBy: distance, limitedBy: end))
-            XCTAssertEqual(i, end)
-        }
-        
-        // when is not empty
-        whenIsNotEmpty()
-        i = sut.startIndex
-        end = sut.endIndex
-        for offset in 0..<sut.count {
-            var distance = 0
-            while distance <= (sut.count - offset) {
-                // and when offsetting doesn't go beyond limit,
-                // then returns true and formed index is
-                // equal to index offsetted by distance amount
-                var j = i
-                var expectedIndex = j
-                sut.formIndex(&expectedIndex, offsetBy: distance)
-                XCTAssertTrue(sut.formIndex(&j, offsetBy: distance, limitedBy: end))
-                XCTAssertEqual(j, expectedIndex)
-                
-                distance += 1
-                
-                // otherwise when offsetting goes beyond limit, then
-                // returns false and formed index is equal to limit:
-                j = i
-                var limit = j
-                sut.formIndex(&limit, offsetBy: distance - 1)
-                XCTAssertFalse(sut.formIndex(&j, offsetBy: distance, limitedBy: limit))
-                XCTAssertEqual(j, limit)
-            }
-            
-            sut.formIndex(after: &i)
-        }
-    }
-    
     func testIndexOffsetByLimitedBy() {
         // when is empty and distance is 0, then returns endIndex
         XCTAssertTrue(sut.isEmpty)

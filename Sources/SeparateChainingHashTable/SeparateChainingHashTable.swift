@@ -1140,30 +1140,27 @@ extension SeparateChainingHashTable: Collection {
         
         return offSetted
     }
- 
-    public func formIndex(_ i: inout Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Bool {
+    
+    public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
         precondition(distance >= 0 , "distance must not be negative")
         precondition(i.isValidFor(self), "invalid index for this hash table")
         precondition(limit.isValidFor(self), "invalid limit index for this hash table")
         
-        guard
-            distance > 0
-        else { return i <= limit }
+        // Just ignore the limit when is less than i
+        if limit < i { return index(i, offsetBy: distance) }
         
-        let end = endIndex
-        var offset = 0
-        while offset < distance && i < end && i < limit {
-            i.moveToNextElement(on: self.buffer)
-            offset += 1
+        // let's stride indices:
+        var result = i
+        for _ in stride(from: 0, to: distance, by: 1) {
+            // When we're gonna end up after limit we return nil
+            if result == limit { return nil }
+            // When we're already at endIndex with more positions to advance,
+            // we return nil
+            if result == endIndex { return nil }
+            result.moveToNextElement(on: self.buffer)
         }
         
-        return distance == offset
-    }
-    
-    public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
-        var offsetted = i
-        let formed = formIndex(&offsetted, offsetBy: distance, limitedBy: limit)
-        return  formed == true ? offsetted : nil
+        return result
     }
     
     /// Returns the index for the given key.
