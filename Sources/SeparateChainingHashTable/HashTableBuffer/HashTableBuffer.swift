@@ -37,7 +37,7 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
     
     private(set) var capacity: Int
     
-    private(set) var count: Int
+    fileprivate(set) var count: Int
     
     var isEmpty: Bool { count == 0 }
     
@@ -357,32 +357,41 @@ final class HashTableBuffer<Key: Hashable, Value>: NSCopying {
 extension HashTableBuffer: Sequence {
     typealias Element = (key: Key, value: Value)
     
+    struct Iterator: IteratorProtocol {
+        private let iter: AnyIterator<Element>
+        
+        fileprivate init(_ buffer: HashTableBuffer) {
+            var currentIdx: Int = buffer.firstTableElement
+            var currentBagIterator: Bag.Iterator?
+            
+            self.iter = AnyIterator {
+                guard
+                    let nextElement = currentBagIterator?.next()
+                else {
+                    while currentIdx < buffer.capacity {
+                        if let bag = buffer.table[currentIdx] {
+                            currentIdx += 1
+                            currentBagIterator = bag.makeIterator()
+                            break
+                        }
+                        currentIdx += 1
+                    }
+                    
+                    return currentBagIterator?.next()
+                }
+                
+                return nextElement
+            }
+        }
+        
+        mutating func next() -> Element? { iter.next() }
+        
+    }
+    
     @inlinable
     var underestimatedCount: Int { count }
     
-    func makeIterator() -> AnyIterator<Element> {
-        var currentIdx: Int = firstTableElement
-        var currentBagIterator: AnyIterator<Element>?
- 
-        return AnyIterator { 
-            guard
-                let nextElement = currentBagIterator?.next()
-            else {
-                while currentIdx < self.capacity {
-                    if let bag = self.table[currentIdx] {
-                        currentIdx += 1
-                        currentBagIterator = bag.makeIterator()
-                        break
-                    }
-                    currentIdx += 1
-                }
-                
-                return currentBagIterator?.next()
-            }
-            
-            return nextElement
-        }
-    }
+    func makeIterator() -> Iterator { Iterator(self) }
     
 }
 
@@ -419,217 +428,45 @@ extension HashTableBuffer: Hashable where Value: Hashable {
     
 }
 
-// MARK: - Bag
+
+
+// MARK: - Helpers for _modify in subscript(key:default:)
 extension HashTableBuffer {
-    final class Bag: NSCopying {
-        typealias Element = (key: Key, value: Value)
-        
-        var key: Key
-        
-        var value: Value
-        
-        var next: Bag? = nil
-        
-        var count: Int = 1
-        
-        var element: Element { (key, value) }
-        
-        init(key: Key, value: Value) {
-            self.key = key
-            self.value = value
-        }
-        
-        init(_ element: Element) {
-            self.key = element.key
-            self.value = element.value
-        }
-        
-        func copy(with zone: NSZone? = nil) -> Any {
-            let kClone: Key!
-            let vClone: Value!
-            if let k = key as? NSCopying {
-                kClone = (k.copy(with: zone) as! Key)
-            } else {
-                kClone = key
-            }
-            if let v = value as? NSCopying {
-                vClone = (v.copy(with: zone) as! Value)
-            } else {
-                vClone = value
-            }
-            
-            let clone = Bag(key: kClone, value: vClone)
-            clone.count = count
-            clone.next = next?.copy(with: zone) as? Bag
-            
-            return clone
-        }
-        
-        @inlinable
-        func clone() -> Bag {
-            copy() as! Bag
-        }
-        
-        @discardableResult
-        func getValue(forKey k: Key) -> Value? {
-            guard key != k else { return value }
-            
-            return next?.getValue(forKey: k)
-        }
-        
-        @discardableResult
-        func updateValue(_ v: Value, forKey k: Key) -> Value? {
-            guard
-                k != key
-            else {
-                let oldValue = value
-                value = v
-                
-                return oldValue
-            }
-            
-            guard
-                next != nil
-            else {
-                next = Bag(key: k, value: v)
-                count += 1
-                
-                return nil
-            }
-    
-            let result = next!.updateValue(v, forKey: k)
-            updateCount()
-            
-            return result
-        }
-        
-        func setValue(_ v: Value, forKey k: Key, uniquingKeysWith combine: (Value, Value) throws -> Value) rethrows {
-            guard key != k else {
-                let newValue = try combine(value, v)
-                value = newValue
-                
-                return
-            }
-            
-            guard next != nil else {
-                next = Bag(key: k, value: v)
-                count += 1
-                
-                return
-            }
-            
-            try next!.setValue(v, forKey: k, uniquingKeysWith: combine)
-            updateCount()
-        }
-        
-        @inlinable
-        func setValue(_ v: Value, forKey k: Key) {
-            setValue(v, forKey: k, uniquingKeysWith: { _, new in new })
-        }
-        
-        func removingValue(forKey k: Key) -> (afterRemoval: Bag?, removedValue: Value?) {
-            guard k != key else {
-                let n = next
-                next = nil
-                
-                return (n, value)
-            }
-            
-            let removingOnNext = next?.removingValue(forKey: k)
-            self.next = removingOnNext?.afterRemoval
-            updateCount()
-            
-            return (self, removingOnNext?.removedValue)
-        }
-        
-        func mapValue<T>(_ transform: (Value) throws -> T) rethrows -> HashTableBuffer<Key, T>.Bag {
-            let mappedValue: T = try transform(value)
-            let mappedBag = HashTableBuffer<Key, T>.Bag(key: key, value: mappedValue)
-            mappedBag.count = count
-            mappedBag.next = try next?.mapValue(transform)
-            
-            return mappedBag
-        }
-        
-        func compactMapValue<T>(_ transform: (Value) throws -> T?) rethrows -> HashTableBuffer<Key, T>.Bag? {
-            guard
-                let mappedValue = try transform(value)
-            else {
-                
-                return try next?.compactMapValue(transform)
-            }
-            
-            let mappedBag = HashTableBuffer<Key, T>.Bag(key: key, value: mappedValue)
-            mappedBag.next = try next?.compactMapValue(transform)
-            mappedBag.updateCount()
-            
-            return mappedBag
-        }
-        
-        func filter(_ isIncluded: (Element) throws -> Bool) rethrows -> Bag? {
-            guard
-                try isIncluded(element)
-            else {
-                return try next?.filter(isIncluded)
-            }
-            next = try next?.filter(isIncluded)
-            updateCount()
-            
-            return self
-        }
-        
-        @inline(__always)
-        private func updateCount() {
-            count = 1 + (next?.count ?? 0)
-        }
-        
-    }
-    
-}
-
-extension HashTableBuffer.Bag: Sequence {
     @inlinable
-    var underestimatedCount: Int { count }
-    
-    func makeIterator() -> AnyIterator<Element> {
-        unowned(unsafe) var current: HashTableBuffer.Bag? = self
+    func getBag(forKey key: Key) -> Bag? {
+        let i = hashIndex(forKey: key)
+        var bag = table[i]
+        while bag != nil && bag!.key != key { bag = bag?.next }
         
-        return AnyIterator {
-            defer { current = current?.next }
-            
-            return current?.element
-        }
+        return bag
     }
     
-}
-
-extension HashTableBuffer.Bag: Equatable where Value: Equatable {
-    static func == (lhs: HashTableBuffer<Key, Value>.Bag, rhs: HashTableBuffer<Key, Value>.Bag) -> Bool {
-        guard lhs !== rhs else { return true }
-        
+    @inlinable
+    func setNewElementWith(key: Key, value: Value) -> Bag {
+        defer {
+            count += 1
+            if i < firstTableElement {
+                firstTableElement = i
+            }
+        }
+        let b = Bag(key: key, value: value)
+        let i = hashIndex(forKey: key)
         guard
-            lhs.count == rhs.count,
-            lhs.key == rhs.key,
-            lhs.value == rhs.value
-        else { return false }
-        
-        switch (lhs.next, rhs.next) {
-        case (nil, nil): return true
-        case (.some(let lN), .some(let rN)):
-            return lN == rN
-        default:
-            return false
+            var prevBag = table[i]
+        else {
+            table[i] = b
+            
+            return b
         }
-    }
-    
-}
-
-extension HashTableBuffer.Bag: Hashable where Value: Hashable {
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(count)
-        hasher.combine(key)
-        hasher.combine(value)
-        next?.hash(into: &hasher)
+        
+        assert(prevBag.getValue(forKey: key) == nil, "There is already a bag with k: \(key)")
+        while prevBag.next != nil {
+            prevBag.count += 1
+            prevBag = prevBag.next!
+        }
+        prevBag.next = b
+        
+        return b
     }
     
 }

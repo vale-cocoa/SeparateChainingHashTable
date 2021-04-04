@@ -794,6 +794,7 @@ final class HashTableBufferTests: XCTestCase {
     func testMakeIterator() {
         XCTAssertTrue(sut.isEmpty)
         XCTAssertNotNil(sut.makeIterator())
+        
         whenIsNotEmpty()
         XCTAssertNotNil(sut.makeIterator())
     }

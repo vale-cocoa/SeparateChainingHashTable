@@ -180,7 +180,7 @@ final class CollectionConformanceTests: XCTestCase {
         var end = sut.endIndex
         XCTAssertEqual(sut.index(i, offsetBy: 0, limitedBy: end), end)
         
-        // when is empty and distance is grater than 0,
+        // when is empty and distance is greater than 0,
         // then returns nil
         for distance in 1..<10 {
             XCTAssertNil(sut.index(i, offsetBy: distance, limitedBy: end))
