@@ -31,7 +31,7 @@ extension SeparateChainingHashTable {
     ///
     /// This *key-based* subscript returns the value for the given key if the key
     /// is found in the hash table, or `nil` if the key is not found.
-    /// The setter of this subscript might invalidate all indices of the hash table.
+    /// The setter of this subscript might invalidate indices of the hash table that were previously stored.
     ///
     /// The following example creates a new hash table and prints the value of a
     /// key found in the has table (`"Coral"`) and a key not found in the
@@ -92,7 +92,7 @@ extension SeparateChainingHashTable {
     ///
     /// Use this subscript when you want either the value for a particular key
     /// or, when that key is not present in the hash table, a default value.
-    /// The setter of this subscript might invalidate all indices of the hash table.
+    /// The setter of this subscript might invalidate indices of the hash table that were previously stored.
     /// This example uses the subscript with a message to use in case an HTTP response
     /// code isn't recognized:
     ///

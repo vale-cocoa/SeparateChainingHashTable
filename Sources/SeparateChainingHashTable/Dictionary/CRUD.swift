@@ -43,7 +43,7 @@ extension SeparateChainingHashTable {
     /// Use this method instead of key-based subscripting when you need to know
     /// whether the new value supplants the value of an existing key. If the
     /// value of an existing key is updated, `updateValue(_:forKey:)` returns
-    /// the original value. This method might invalidate all indices of the hash table.
+    /// the original value. This method might invalidate indices of the hash table that were previously stored.
     ///
     ///     var hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
     ///
@@ -80,7 +80,7 @@ extension SeparateChainingHashTable {
     /// Removes the given key and its associated value from the hash table.
     ///
     /// If the key is found in the hash table, this method returns the key's
-    /// associated value. This method invalidates all indices of the hash table.
+    /// associated value. This method might invalidate indices of the hash table that were previously stored.
     ///
     ///     var hues: SeparateChainingHashTable<String, Int> = ["Heliotrope": 296, "Coral": 16, "Aquamarine": 156]
     ///     if let value = hues.removeValue(forKey: "Coral") {
@@ -112,7 +112,7 @@ extension SeparateChainingHashTable {
     
     /// Removes all key-value pairs from the hash table.
     ///
-    /// Calling this method invalidates all indices of the hash table.
+    /// Calling this method might invalidate indices of the hash table that were previously stored.
     ///
     /// - Parameter keepCapacity:   Whether the hash table should keep its
     ///                             underlying buffer.
@@ -142,7 +142,7 @@ extension SeparateChainingHashTable {
     /// method to avoid multiple reallocations. This method ensures that the
     /// hash table has unique, mutable, contiguous storage, with space allocated
     /// for at least the requested number of key-value pairs.
-    /// This method might invalidate all indices of the hash table.
+    /// This method might invalidate indices of the hash table that were previously stored.
     ///
     /// - Parameter minimumCapacity:    The requested number of
     ///                                 key-value pairs to store.

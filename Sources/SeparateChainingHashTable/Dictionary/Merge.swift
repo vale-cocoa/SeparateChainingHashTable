@@ -36,7 +36,7 @@ extension SeparateChainingHashTable {
     /// with the current and new values for any duplicate keys that are
     /// encountered.
     ///
-    /// This method invalidates all indices of the hash table.
+    /// This method might invalidate indices of the hash table that were previously stored.
     /// This example shows how to choose the current or new values for any
     /// duplicate keys:
     ///
@@ -73,7 +73,7 @@ extension SeparateChainingHashTable {
     /// is called with the current and new values for any duplicate keys that
     /// are encountered.
     ///
-    /// This method might invalidate all indices of the hash table.
+    /// This method might invalidate indices of the hash table that were previously stored.
     /// This example shows how to choose the current or new values for any
     /// duplicate keys:
     ///
