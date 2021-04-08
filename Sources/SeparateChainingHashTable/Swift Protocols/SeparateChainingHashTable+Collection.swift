@@ -51,14 +51,10 @@ extension SeparateChainingHashTable: Collection {
     public var endIndex: Index { Index(asEndIndexOf: self) }
     
     public func formIndex(after i: inout Index) {
-        precondition(i.isValidFor(self), "Invalid index for this hash table")
-        
         i.moveToNextElement(on: self.buffer)
     }
     
     public func index(after i: Index) -> Index {
-        precondition(i.isValidFor(self), "Invalid index for this hash table")
-        
         var nextIndex = i
         nextIndex.moveToNextElement(on: self.buffer)
         
@@ -67,12 +63,8 @@ extension SeparateChainingHashTable: Collection {
     
     public func formIndex(_ i: inout Index, offsetBy distance: Int) {
         precondition(distance >= 0 , "distance must not be negative")
-        precondition(i.isValidFor(self), "Invalid index for this hash table")
-        let end = endIndex
-        var offset = 0
-        while offset < distance && i < end {
+        for _ in stride(from: 0, to: distance, by: 1) {
             i.moveToNextElement(on: self.buffer)
-            offset += 1
         }
     }
     
@@ -85,8 +77,6 @@ extension SeparateChainingHashTable: Collection {
     
     public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
         precondition(distance >= 0 , "distance must not be negative")
-        precondition(i.isValidFor(self), "Invalid index for this hash table")
-        precondition(limit.isValidFor(self), "Invalid limit index for this hash table")
         
         // Just ignore the limit when is less than i
         if limit < i { return index(i, offsetBy: distance) }
@@ -96,9 +86,6 @@ extension SeparateChainingHashTable: Collection {
         for _ in stride(from: 0, to: distance, by: 1) {
             // When we're gonna end up after limit we return nil
             if result == limit { return nil }
-            // When we're already at endIndex with more positions to advance,
-            // we return nil
-            if result == endIndex { return nil }
             result.moveToNextElement(on: self.buffer)
         }
         
@@ -150,11 +137,10 @@ extension SeparateChainingHashTable: Collection {
     ///             `position`.
     public subscript(position: Index) -> (key: Key, value: Value) {
         get {
-            precondition(position.isValidFor(self), "Invalid index for this hash table")
             guard
                 let element = position.currentBag(on: self.buffer)?.element
             else {
-                preconditionFailure("index out of bounds")
+                preconditionFailure("Index out of bounds")
             }
            
             return element
@@ -174,11 +160,12 @@ extension SeparateChainingHashTable: Collection {
     /// - Complexity: Amortized O(1).
     @discardableResult
     public mutating func remove(at index: Index) -> Element {
-        precondition(index.isValidFor(self), "invalid index for this hash table")
         guard
-            let removedElement = index.currentBag(on: buffer)?.element else {
-            preconditionFailure("index out of bounds")
+            let removedElement = index.currentBag(on: buffer)?.element
+        else {
+            preconditionFailure("Index out of bounds")
         }
+        
         makeUniqueEventuallyReducingCapacity()
         defer { removeValue(forKey: removedElement.key) }
         

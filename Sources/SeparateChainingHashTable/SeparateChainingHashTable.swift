@@ -34,11 +34,7 @@ import Foundation
 /// - ToDo: Add `CustomStringConvertible` and
 ///         `CustomDebugStringConvertible` conformances.
 public struct SeparateChainingHashTable<Key: Hashable, Value> {
-    final class ID {  }
-    
     private(set) var buffer: HashTableBuffer<Key, Value>? = nil
-    
-    private(set) var id = ID()
     
     @inline(__always)
     internal static var minBufferCapacity: Int {
@@ -49,19 +45,17 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
     public init() {  }
     
     internal init(_ other: SeparateChainingHashTable) {
-        self.init(buffer: other.buffer, id: other.id)
+        self.init(buffer: other.buffer)
     }
     
-    internal init(buffer: HashTableBuffer<Key, Value>?, id: ID = ID()) {
+    internal init(buffer: HashTableBuffer<Key, Value>?) {
         self.buffer = buffer
-        self.id = id
     }
     
     // MARK: - Copy On Write helpers
     @inline(__always)
     internal mutating func makeUnique() {
         guard buffer != nil else {
-            id = ID()
             buffer = HashTableBuffer(minimumCapacity: Self.minBufferCapacity)
             
             return
@@ -83,7 +77,6 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
             return
         }
         
-        id = ID()
         let mCapacity = buffer == nil ? Swift.max(k, Self.minBufferCapacity) : Swift.max(((count + k) * 3) / 2, capacity * 2)
         buffer = buffer?.clone(newCapacity: mCapacity) ?? HashTableBuffer(minimumCapacity: mCapacity)
     }
@@ -98,13 +91,11 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
             return
         }
         
-        id = ID()
         buffer = buffer!.clone(newCapacity: capacity * 2)
     }
     
     @inline(__always)
     internal mutating func makeUniqueEventuallyReducingCapacity() {
-        id = ID()
         guard
             !isEmpty
         else {
@@ -132,9 +123,6 @@ public struct SeparateChainingHashTable<Key: Hashable, Value> {
         
         return buffer!.capacity - buffer!.count
     }
-    
-    @inline(__always)
-    internal mutating func changeIndexID() { id = ID() }
     
 }
 

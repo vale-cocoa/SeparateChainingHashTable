@@ -59,7 +59,6 @@ extension SeparateChainingHashTable {
         if let other = keysAndValues as? SeparateChainingHashTable<Key, Value> {
             try merge(other, uniquingKeysWith: combine)
         } else {
-            changeIndexID()
             makeUnique()
             try buffer!.merge(keysAndValues, uniquingKeysWith: combine)
         }
@@ -107,7 +106,6 @@ extension SeparateChainingHashTable {
         }
         
         makeUnique()
-        changeIndexID()
         try! buffer!.merge(other.buffer!, uniquingKeysWith: combine)
     }
     

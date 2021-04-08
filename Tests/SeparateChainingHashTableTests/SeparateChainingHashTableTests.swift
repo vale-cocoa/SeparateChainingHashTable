@@ -80,7 +80,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
         sut = HashTable(minimumCapacity: 0)
         XCTAssertNotNil(sut)
         XCTAssertNil(sut.buffer)
-        XCTAssertNotNil(sut.id)
         
         // when k is greater than zero, then buffer is not nil and
         // its capacity is greater than zero and equal to Swift.max(k, bufferMinimumCapacity)
@@ -90,7 +89,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
         XCTAssertNotNil(sut)
         XCTAssertNotNil(sut.buffer)
         XCTAssertEqual(sut.buffer?.capacity, expectedCapacity)
-        XCTAssertNotNil(sut.id)
     }
     
     func testInitUniqueKeysWithValues() {
@@ -520,52 +518,28 @@ final class SeparateChainingHashTableTests: XCTestCase {
         // when buffer is nil
         XCTAssertNil(sut.buffer)
         var clone = sut
-        var prevID = sut.id
         weak var prevBuffer = sut.buffer
-        var prevCapacity = sut.capacity
         
         sut[k, default: defaultValue] = newValue
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
-        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
         XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
         
         // when buffer is not nil and is empty
         sut = SeparateChainingHashTable(minimumCapacity: Int.random(in: 1...10))
         clone = sut
-        prevID = sut.id
         prevBuffer = sut.buffer
-        prevCapacity = sut.capacity
         
         sut[k, default: defaultValue] = newValue
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
-        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
         XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
         
         // when is not empty
         whenIsNotEmpty()
         clone = sut
-        prevID = sut.id
         prevBuffer = sut.buffer
-        prevCapacity = sut.capacity
         
         sut[k, default: defaultValue] = newValue
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied the buffer")
-        XCTAssertTrue(clone?.id === prevID, "has changed clone's id")
         XCTAssertTrue(clone?.buffer === prevBuffer, "has changed clone's buffer")
     }
     
@@ -574,58 +548,33 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testUpdateValueForKey_copyOnWrite() {
         // when buffer is nil
         XCTAssertNil(sut.buffer)
-        var prevID = sut.id
         var copy = sut
-        var prevCapacity = sut.capacity
         
         sut.updateValue(randomValue(), forKey: randomKey())
-        if sut.capacity != prevCapacity {
-            XCTAssertFalse(sut.id === prevID, "should have updated id")
-        } else {
-            XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-        }
         XCTAssertNotNil(sut.buffer)
         XCTAssertNil(copy?.buffer)
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         
         // when buffer is not nil
         whenIsNotEmpty()
         weak var prevBuffer = sut.buffer
-        prevID = sut.id
         copy = sut
         
         for _ in 0..<10 {
             prevBuffer = sut.buffer
-            prevID = sut.id
             copy = sut
-            prevCapacity = sut.capacity
             
             sut.updateValue(randomValue(), forKey: notContainedKey)
             XCTAssertFalse(sut.buffer === prevBuffer, "has not copied its buffer")
             XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
-            XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         }
         
         for k in containedKeys {
-            prevID = sut.id
             prevBuffer = sut.buffer
             copy = sut
-            prevCapacity = sut.capacity
             
             sut.updateValue(randomValue(), forKey: k)
             XCTAssertFalse(sut.buffer === prevBuffer, "has not copied its buffer")
             XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
-            XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         }
     }
     
@@ -634,51 +583,39 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testRemoveValueForKey_copyOnWrite() {
         // when buffer is nil
         XCTAssertNil(sut.buffer)
-        var prevID = sut.id
         var copy = sut
         
         sut.removeValue(forKey: randomKey())
         XCTAssertNil(sut.buffer)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertNil(copy?.buffer)
         
         // when buffer is not nil and isEmpty == true
         sut = HashTable(minimumCapacity: Int.random(in: 1...10))
-        prevID = sut.id
         weak var prevBuffer = sut.buffer
         copy = sut
         
         sut.removeValue(forKey: randomKey())
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied its buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
         XCTAssertFalse(sut.buffer?.tableIsTooSparse ?? false)
         
         // when is not empty and buffer doesn't contain an element with key
         whenIsNotEmpty()
-        prevID = sut.id
         prevBuffer = sut.buffer
         copy = sut
         
         sut.removeValue(forKey: notContainedKey)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied its buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
         XCTAssertFalse(sut.buffer?.tableIsTooSparse ?? false)
         
         // when is not empty and buffer contains element with key
         for k in containedKeys {
-            prevID = sut.id
             prevBuffer = sut.buffer
             copy = sut
             
             sut.removeValue(forKey: k)
-            XCTAssertFalse(sut.id === prevID, "has not updated id")
             XCTAssertFalse(sut.buffer === prevBuffer, "has not copied its buffer")
-            XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
             XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
         }
         XCTAssertFalse(sut.buffer?.tableIsTooSparse ?? false)
@@ -687,32 +624,26 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testRemoveAllKeepingCapacity_whenKeepCapacityIsTrue_thenKeepsCapacityAfterHavingRemovedAllElements() {
         // when buffer is nil
         XCTAssertNil(sut.buffer)
-        var prevID = sut.id
         
         sut.removeAll(keepingCapacity: true)
-        XCTAssertTrue(sut.id === prevID, "has updated id")
         XCTAssertNil(sut.buffer)
         
         // when buffer is not nil and is empty
         sut = HashTable(minimumCapacity: Int.random(in: 1...10))
-        prevID = sut.id
         var prevCapacity = sut.capacity
         weak var prevBuffer = sut.buffer
         
         sut.removeAll(keepingCapacity: true)
-        XCTAssertTrue(sut.id === prevID, "has updated id")
         XCTAssertEqual(sut.capacity, prevCapacity)
         XCTAssertTrue(sut.buffer === prevBuffer, "has changed its buffer")
         XCTAssertTrue(sut.isEmpty)
         
         // when is not empty
         whenIsNotEmpty()
-        prevID = sut.id
         prevCapacity = sut.capacity
         prevBuffer = sut.buffer
         
         sut.removeAll(keepingCapacity: true)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertEqual(sut.capacity, prevCapacity)
         XCTAssertFalse(sut.buffer === prevBuffer, "has not changed its buffer")
         XCTAssertTrue(sut.isEmpty)
@@ -722,30 +653,24 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testRemoveAllKeepingCapacity_whenKeepCapacityIsFalse_thenSetsBufferToNil() {
         // when buffer is nil
         XCTAssertNil(sut.buffer)
-        var prevID = sut.id
         
         sut.removeAll(keepingCapacity: false)
-        XCTAssertTrue(sut.id === prevID, "has updated id")
         XCTAssertNil(sut.buffer)
         
         // when buffer is not nil and is empty
         sut = HashTable(minimumCapacity: Int.random(in: 1...10))
-        prevID = sut.id
         weak var prevBuffer = sut.buffer
         
         sut.removeAll(keepingCapacity: false)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertEqual(sut.capacity, 0)
         XCTAssertNil(sut.buffer)
         XCTAssertNil(prevBuffer)
         
         // when is not empty
         whenIsNotEmpty()
-        prevID = sut.id
         prevBuffer = sut.buffer
         
         sut.removeAll(keepingCapacity: false)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertEqual(sut.capacity, 0)
         XCTAssertNil(sut.buffer)
         XCTAssertNil(prevBuffer)
@@ -766,47 +691,26 @@ final class SeparateChainingHashTableTests: XCTestCase {
         // then initializes a new buffer with minimumBufferCapacity as capacity
         for mc in 0...minBufferCapacity {
             sut = HashTable()
-            let prevID = sut.id
-            let prevCapacity = sut.capacity
             
             sut.reserveCapacity(mc)
             XCTAssertEqual(sut.capacity, minBufferCapacity)
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
         }
         
         // when buffer is nil and minimumCapacity is greater than minimumBufferCapacity,
         // then initializes a new buffer with minimumCapacity as capacity
         for mc in (minBufferCapacity + 1)..<(minBufferCapacity + 10) {
             sut = HashTable()
-            let prevID = sut.id
-            let prevCapacity = sut.capacity
             
             sut.reserveCapacity(mc)
             XCTAssertEqual(sut.capacity, mc)
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
         }
         
         // when buffer is not nil, isEmpty == true, then eventually resizes buffer so that
         // its capacity will be greater than or equal to minimumCapacity
         for mc in 0..<(minBufferCapacity + 10) {
             sut = HashTable(minimumCapacity: minBufferCapacity)
-            let prevID = sut.id
-            let prevCapacity = sut.capacity
             
             sut.reserveCapacity(mc)
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
             XCTAssertGreaterThanOrEqual(sut.capacity, mc)
         }
         
@@ -814,15 +718,8 @@ final class SeparateChainingHashTableTests: XCTestCase {
         // will be greater than or equal to minimumCapacity
         for mc in 0..<30 {
             whenIsNotEmpty()
-            let prevID = sut.id
-            let prevCapacity = sut.capacity
             
             sut.reserveCapacity(mc)
-            if sut.capacity != prevCapacity {
-                XCTAssertFalse(sut.id === prevID, "should have updated id")
-            } else {
-                XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
-            }
             XCTAssertGreaterThanOrEqual(sut.capacity - sut.count, mc)
         }
     }
@@ -831,15 +728,12 @@ final class SeparateChainingHashTableTests: XCTestCase {
         // Main merging functionalities already tested in HashTableBufferTests
         
         whenIsNotEmpty()
-        weak var prevID = sut.id
         weak var prevBuffer = sut.buffer
         let copy = sut
         let other = givenKeysAndValuesWithDuplicateKeys()
         
         sut.merge(other, uniquingKeysWith: +)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
     }
     
@@ -848,28 +742,22 @@ final class SeparateChainingHashTableTests: XCTestCase {
         
         // other isEmpty == false
         whenIsNotEmpty()
-        var prevID = sut.id
         weak var prevBuffer = sut.buffer
         var copy = sut
         var other = HashTable(uniqueKeysWithValues: givenKeysAndValuesWithoutDuplicateKeys())
         
         sut.merge(other, uniquingKeysWith: +)
-        XCTAssertFalse(sut.id === prevID, "should have updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not copied buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
         
         // other isEmpty == true
         whenIsNotEmpty()
-        prevID = sut.id
         prevBuffer = sut.buffer
         copy = sut
         other = HashTable()
         
         sut.merge(other, uniquingKeysWith: +)
-        XCTAssertTrue(sut.id === prevID, "shouldn't have updated id")
         XCTAssertTrue(sut.buffer === prevBuffer, "has copied buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed its id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed its buffer")
     }
     
@@ -882,7 +770,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
         
         var result = sut.merging(other, uniquingKeysWith: +)
         XCTAssertTrue(result.buffer === other.buffer, "has not returned the very same other")
-        XCTAssertTrue(result.id === other.id, "has not returned the very same other")
         
         // when self.isEmpty == false and other.isEmpty == true, then returns self
         whenIsNotEmpty()
@@ -890,7 +777,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
         
         result = sut.merging(other, uniquingKeysWith: +)
         XCTAssertTrue(result.buffer === sut.buffer, "has not returned the very same self")
-        XCTAssertTrue(result.id === sut.id, "has not returned the very same self")
     }
     
     func testMergingOtherUniquingKeysWith_whenBothAreNotEmpty_thenReturnsMerged() {
@@ -956,7 +842,6 @@ final class SeparateChainingHashTableTests: XCTestCase {
     
     func testRemoveAt() {
         whenIsNotEmpty()
-        weak var prevID = sut.id
         let key = containedKeys.randomElement()!
         let expectedResultValue = sut[key]
         let idx = HashTable.Index(asIndexOfKey: key, for: sut)!
@@ -965,21 +850,17 @@ final class SeparateChainingHashTableTests: XCTestCase {
         XCTAssertEqual(result.key, key)
         XCTAssertEqual(result.value, expectedResultValue)
         XCTAssertNil(sut[key])
-        XCTAssertFalse(sut.id === prevID, "has not updated ID")
     }
     
     func testRemoveAt_copyOnWrite() {
         whenIsNotEmpty()
         let key = containedKeys.randomElement()!
         let idx = HashTable.Index(asIndexOfKey: key, for: sut)!
-        weak var prevID = sut.id
         weak var prevBuffer = sut.buffer
         let copy = sut
         
         sut.remove(at: idx)
-        XCTAssertFalse(sut.id === prevID, "has not updated id")
         XCTAssertFalse(sut.buffer === prevBuffer, "has not updated buffer")
-        XCTAssertTrue(copy?.id === prevID, "copy has changed id")
         XCTAssertTrue(copy?.buffer === prevBuffer, "copy has changed buffer")
     }
     

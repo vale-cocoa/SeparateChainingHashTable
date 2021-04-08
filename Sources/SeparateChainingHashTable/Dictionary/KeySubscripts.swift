@@ -158,7 +158,6 @@ extension SeparateChainingHashTable {
                 if other.buffer!.tableIsTooTight {
                     let newCapacity = Swift.max((other.count + 1) * 3 / 2, other.capacity * 2)
                     other.buffer!.resizeTo(newCapacity: newCapacity)
-                    other.changeIndexID()
                 }
                 bag = other.buffer!.setNewElementWith(key: key, value: defaultValue())
             }

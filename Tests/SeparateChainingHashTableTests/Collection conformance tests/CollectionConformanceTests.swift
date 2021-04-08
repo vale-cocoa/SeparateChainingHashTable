@@ -105,10 +105,10 @@ final class CollectionConformanceTests: XCTestCase {
             XCTAssertEqual(i, other)
         }
         
-        // when index is endIndex, then stays equal to endIndex
+        // when index is endIndex, then goes beyond endIndex
         i = sut.endIndex
         sut.formIndex(after: &i)
-        XCTAssertEqual(i, sut.endIndex)
+        XCTAssertGreaterThan(i, sut.endIndex)
     }
     
     func testIndexAfter() {
@@ -122,8 +122,8 @@ final class CollectionConformanceTests: XCTestCase {
             XCTAssertEqual(n, i)
         }
         
-        // when index is endIndex then returns endIndex
-        XCTAssertEqual(sut.index(after: sut.endIndex), sut.endIndex)
+        // when index is endIndex then greturns index beyond endIndex
+        XCTAssertGreaterThan(sut.index(after: sut.endIndex), sut.endIndex)
     }
     
     // This test will also test internal method formIndex(_:offsetBy:)
@@ -133,7 +133,7 @@ final class CollectionConformanceTests: XCTestCase {
         var start = sut.startIndex
         var end = sut.endIndex
         for distance in 0..<100 {
-            XCTAssertEqual(sut.index(start, offsetBy: distance), end)
+            XCTAssertGreaterThanOrEqual(sut.index(start, offsetBy: distance), end)
         }
         
         // when is not empty
@@ -162,11 +162,11 @@ final class CollectionConformanceTests: XCTestCase {
             }
             
             // otherwise when adding distance would go beyond
-            // last element, then returns endIndex
+            // last element, then returns index greater than or equal to endIndex
             for distance in sut.count - offset..<(sut.count - offset + Int.random(in: 0...10)) {
                 XCTAssertGreaterThanOrEqual(distance + offset, sut.count)
                 let offsetted = sut.index(i, offsetBy: distance)
-                XCTAssertEqual(offsetted, end)
+                XCTAssertGreaterThanOrEqual(offsetted, end)
             }
             
             sut.formIndex(after: &i)

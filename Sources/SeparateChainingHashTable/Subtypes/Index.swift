@@ -39,26 +39,21 @@ extension SeparateChainingHashTable {
     ///
     ///        (k, v) = d[i]
     public struct Index: Comparable {
-        fileprivate(set) internal var id: ID
-        
         internal var currentTableIndex: Int
         
         internal var currentBagOffset: Int = 0
         
         internal init(asStartIndexOf ht: SeparateChainingHashTable) {
-            self.id = ht.id
             self.currentTableIndex = ht.buffer?.firstTableElement ?? ht.capacity
         }
         
         internal init(asEndIndexOf ht: SeparateChainingHashTable) {
-            self.id = ht.id
             self.currentTableIndex = ht.capacity
         }
         
         internal init?(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
             guard !ht.isEmpty else { return nil }
             
-            self.id = ht.id
             self.currentTableIndex = ht.buffer!.hashIndex(forKey: k)
             var currentBag = ht.buffer!.table[currentTableIndex]
             while currentBag != nil {
@@ -82,7 +77,8 @@ extension SeparateChainingHashTable {
             else { return nil }
             
             if currentBagOffset == 0 { return bag }
-            precondition(currentBagOffset < bag.count, "Malformed index")
+            guard currentBagOffset < bag.count else { return nil }
+            
             for _ in 0..<currentBagOffset {
                 bag = bag.next!
             }
@@ -92,50 +88,30 @@ extension SeparateChainingHashTable {
         
         @discardableResult
         internal mutating func moveToNextElement(on buffer: HashTableBuffer<Key, Value>?) -> HashTableBuffer<Key, Value>.Bag? {
-            guard
-                let thisBag = currentBag(on: buffer)
-            else { return nil }
-            
-            if let nextBag = thisBag.next {
+            if
+                let nextBag = currentBag(on: buffer)?.next {
                 currentBagOffset += 1
                 
                 return nextBag
             }
-            
-            currentTableIndex += 1
+            let bufferCapacity = buffer?.capacity ?? 0
             currentBagOffset = 0
-            while currentTableIndex < buffer!.capacity {
-                if let nextBag = buffer!.table[currentTableIndex] {
-                    
-                    return nextBag
-                }
-                
+            currentTableIndex += 1
+            
+            while currentTableIndex < bufferCapacity {
+                if let nextBag = buffer?.table[currentTableIndex] { return nextBag }
                 currentTableIndex += 1
             }
             
             return nil
         }
         
-        @inline(__always)
-        internal func isValidFor(_ ht: SeparateChainingHashTable) -> Bool {
-            id === ht.id && currentTableIndex <= ht.capacity
-            
-        }
-        
-        @inline(__always)
-        internal static func areValid(lhs: Index, rhs: Index) -> Bool {
-            lhs.id === rhs.id
-        }
-        
         // MARK: - Index Comparable conformance
         public static func == (lhs: Index, rhs: Index) -> Bool {
-            precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
-            
-            return lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBagOffset == rhs.currentBagOffset
+            lhs.currentTableIndex == rhs.currentTableIndex && lhs.currentBagOffset == rhs.currentBagOffset
         }
         
         public static func < (lhs: Index, rhs: Index) -> Bool {
-            precondition(areValid(lhs: lhs, rhs: rhs), "indexes from two different hash tables cannot be compared")
             guard
                 lhs.currentTableIndex != rhs.currentTableIndex
             else {

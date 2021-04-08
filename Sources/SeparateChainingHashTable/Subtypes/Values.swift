@@ -83,7 +83,7 @@ extension SeparateChainingHashTable {
                 ht.makeUnique()
                 guard
                     let b = position.currentBag(on: ht.buffer)
-                else { preconditionFailure("index out of bounds") }
+                else { preconditionFailure("Index out of bounds") }
                 
                 b.value = newValue
             }
