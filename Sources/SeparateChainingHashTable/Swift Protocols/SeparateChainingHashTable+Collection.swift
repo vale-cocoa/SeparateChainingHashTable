@@ -51,13 +51,13 @@ extension SeparateChainingHashTable: Collection {
     public var endIndex: Index { Index(asEndIndexOf: self) }
     
     public func formIndex(after i: inout Index) {
-        precondition(i.isValidFor(self), "invalid index for this hash table")
+        precondition(i.isValidFor(self), "Invalid index for this hash table")
         
         i.moveToNextElement(on: self.buffer)
     }
     
     public func index(after i: Index) -> Index {
-        precondition(i.isValidFor(self), "invalid index for this hash table")
+        precondition(i.isValidFor(self), "Invalid index for this hash table")
         
         var nextIndex = i
         nextIndex.moveToNextElement(on: self.buffer)
@@ -67,7 +67,7 @@ extension SeparateChainingHashTable: Collection {
     
     public func formIndex(_ i: inout Index, offsetBy distance: Int) {
         precondition(distance >= 0 , "distance must not be negative")
-        precondition(i.isValidFor(self), "invalid index for this hash table")
+        precondition(i.isValidFor(self), "Invalid index for this hash table")
         let end = endIndex
         var offset = 0
         while offset < distance && i < end {
@@ -85,8 +85,8 @@ extension SeparateChainingHashTable: Collection {
     
     public func index(_ i: Self.Index, offsetBy distance: Int, limitedBy limit: Self.Index) -> Self.Index? {
         precondition(distance >= 0 , "distance must not be negative")
-        precondition(i.isValidFor(self), "invalid index for this hash table")
-        precondition(limit.isValidFor(self), "invalid limit index for this hash table")
+        precondition(i.isValidFor(self), "Invalid index for this hash table")
+        precondition(limit.isValidFor(self), "Invalid limit index for this hash table")
         
         // Just ignore the limit when is less than i
         if limit < i { return index(i, offsetBy: distance) }
@@ -120,6 +120,8 @@ extension SeparateChainingHashTable: Collection {
     /// - Returns:  The index for `key` and its associated value if `key` is in
     ///             the hash table; otherwise, `nil`.
     public func index(forKey key: Key) -> Index? {
+        Index(asIndexOfKey: key, for: self)
+        /*
         let idx = Index(asIndexOfKey: key, for: self)
         
         guard
@@ -127,6 +129,7 @@ extension SeparateChainingHashTable: Collection {
         else { return nil }
         
         return idx
+        */
     }
     
     /// Accesses the key-value pair at the specified position.
@@ -156,7 +159,7 @@ extension SeparateChainingHashTable: Collection {
     ///             `position`.
     public subscript(position: Index) -> (key: Key, value: Value) {
         get {
-            precondition(position.isValidFor(self), "invalid index for this hash table")
+            precondition(position.isValidFor(self), "Invalid index for this hash table")
             guard
                 let element = position.currentBag(on: self.buffer)?.element
             else {

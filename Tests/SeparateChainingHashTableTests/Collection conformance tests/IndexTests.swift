@@ -126,23 +126,15 @@ final class IndexTests: XCTestCase {
         XCTAssertNil(sut.currentBag(on: ht.buffer))
     }
     
-    func testInitAsIndexForKeyOf_whenKeyIsNotInHashTable_thenReturnsHashTablesEndIndex() {
+    func testInitAsIndexForKeyOf_whenKeyIsNotInHashTable_thenReturnsNil() {
         // when hash table is empty and its buffer is nil
         var ht = givenEmptyHashTable()
         
-        sut = _Index(asIndexOfKey: randomKey(), for: ht)
-        XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertEqual(sut.currentBagOffset, 0)
-        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        XCTAssertNil(_Index(asIndexOfKey: randomKey(), for: ht))
         
         // when hash table is empty and its buffer is not nil
         ht = givenEmptyHashTable(bufferCapacity: Int.random(in: 1...10))
-        sut = _Index(asIndexOfKey: randomKey(), for: ht)
-        XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertEqual(sut.currentBagOffset, 0)
-        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        XCTAssertNil(_Index(asIndexOfKey: randomKey(), for: ht))
         
         // when hash table is not empty
         ht = givenNotEmptyHashTable()
@@ -151,14 +143,9 @@ final class IndexTests: XCTestCase {
         repeat {
             notContainedKey = randomKey(ofLenght: l)
             l += 1
-        }
-        while ht.getValue(forKey: notContainedKey) != nil
+        } while ht.getValue(forKey: notContainedKey) != nil
         
-        sut = _Index(asIndexOfKey: notContainedKey, for: ht)
-        XCTAssertTrue(sut.id === ht.id, "wrong id reference")
-        XCTAssertEqual(sut.currentTableIndex, ht.capacity)
-        XCTAssertEqual(sut.currentBagOffset, 0)
-        XCTAssertNil(sut.currentBag(on: ht.buffer))
+        XCTAssertNil(_Index(asIndexOfKey: notContainedKey, for: ht))
     }
     
     func testInitAsIndexForKeyOf_whenKeyIsInHashTable_thenReturnsIndexPointingToTheHashTableElementForKey() {

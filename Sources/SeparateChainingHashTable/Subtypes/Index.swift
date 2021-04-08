@@ -55,27 +55,27 @@ extension SeparateChainingHashTable {
             self.currentTableIndex = ht.capacity
         }
         
-        internal init(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
+        internal init?(asIndexOfKey k: Key, for ht: SeparateChainingHashTable) {
             self.id = ht.id
-            guard !ht.isEmpty else {
-                self.currentTableIndex = ht.capacity
-                
-                return
-            }
+            guard !ht.isEmpty else { return nil }
             
             self.currentTableIndex = ht.buffer!.hashIndex(forKey: k)
             
-            guard
-                var currentBag = ht.buffer!.table[currentTableIndex]
-            else {
-                self.currentTableIndex = ht.capacity
+            var currentBag = ht.buffer!.table[currentTableIndex]
+            while currentBag != nil {
+                guard currentBag?.key != k else { return }
                 
-                return
+                self.currentBagOffset += 1
+                currentBag = currentBag?.next
             }
             
-            guard
-                currentBag.key != k
-            else { return }
+            return nil
+            /*
+             guard
+                 var currentBag = ht.buffer!.table[currentTableIndex]
+             else { return nil }
+             
+            guard currentBag.key != k else { return }
             
             while let n = currentBag.next {
                 self.currentBagOffset += 1
@@ -83,8 +83,9 @@ extension SeparateChainingHashTable {
                 
                 currentBag = n
             }
-            currentTableIndex = ht.capacity
-            currentBagOffset = 0
+ 
+            return nil
+            */
         }
         
         @discardableResult

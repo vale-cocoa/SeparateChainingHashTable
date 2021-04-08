@@ -959,7 +959,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
         weak var prevID = sut.id
         let key = containedKeys.randomElement()!
         let expectedResultValue = sut[key]
-        let idx = HashTable.Index(asIndexOfKey: key, for: sut)
+        let idx = HashTable.Index(asIndexOfKey: key, for: sut)!
         
         let result = sut.remove(at: idx)
         XCTAssertEqual(result.key, key)
@@ -971,7 +971,7 @@ final class SeparateChainingHashTableTests: XCTestCase {
     func testRemoveAt_copyOnWrite() {
         whenIsNotEmpty()
         let key = containedKeys.randomElement()!
-        let idx = HashTable.Index(asIndexOfKey: key, for: sut)
+        let idx = HashTable.Index(asIndexOfKey: key, for: sut)!
         weak var prevID = sut.id
         weak var prevBuffer = sut.buffer
         let copy = sut
