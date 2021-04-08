@@ -121,15 +121,6 @@ extension SeparateChainingHashTable: Collection {
     ///             the hash table; otherwise, `nil`.
     public func index(forKey key: Key) -> Index? {
         Index(asIndexOfKey: key, for: self)
-        /*
-        let idx = Index(asIndexOfKey: key, for: self)
-        
-        guard
-            idx < endIndex
-        else { return nil }
-        
-        return idx
-        */
     }
     
     /// Accesses the key-value pair at the specified position.
